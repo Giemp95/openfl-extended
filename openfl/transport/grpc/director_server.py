@@ -15,7 +15,7 @@ from google.protobuf.json_format import ParseDict
 from grpc import aio
 from grpc import ssl_server_credentials
 
-from openfl.pipelines import NoCompressionPipeline
+from openfl.pipelines import NoCompressionPipeline, GenericPipeline
 from openfl.protocols import base_pb2
 from openfl.protocols import director_pb2
 from openfl.protocols import director_pb2_grpc
@@ -141,7 +141,7 @@ class DirectorGRPCServer(director_pb2_grpc.DirectorServicer):
 
         tensor_dict = None
         if request.model_proto:
-            tensor_dict, _ = deconstruct_model_proto(request.model_proto, NoCompressionPipeline())
+            tensor_dict, _ = deconstruct_model_proto(request.model_proto, GenericPipeline())
 
         caller = self.get_caller(context)
 
@@ -179,7 +179,7 @@ class DirectorGRPCServer(director_pb2_grpc.DirectorServicer):
         if trained_model_dict is None:
             return director_pb2.TrainedModelResponse()
 
-        model_proto = construct_model_proto(trained_model_dict, 0, NoCompressionPipeline())
+        model_proto = construct_model_proto(trained_model_dict, 0, GenericPipeline())
 
         return director_pb2.TrainedModelResponse(model_proto=model_proto)
 

@@ -166,7 +166,8 @@ class AggregatorGRPCServer(aggregator_pb2_grpc.AggregatorServicer):
             quit=time_to_quit
         )
 
-    def GetAggregatedTensor(self, request, context):  # NOQA:N802
+    # TODO: qua manca il parametro aggregate
+    def GetTensor(self, request, context):  # NOQA:N802
         """
         Request a job from aggregator.
 
@@ -184,13 +185,32 @@ class AggregatorGRPCServer(aggregator_pb2_grpc.AggregatorServicer):
         report = request.report
         tags = tuple(request.tags)
 
-        named_tensor = self.aggregator.get_aggregated_tensor(
+        named_tensor = self.aggregator.get_tensor(
             collaborator_name, tensor_name, round_number, report, tags, require_lossless)
 
         return aggregator_pb2.GetAggregatedTensorResponse(
             header=self.get_header(collaborator_name),
             round_number=round_number,
             tensor=named_tensor
+        )
+
+    def GetSynch(self, request, context):  # NOQA:N802
+        """
+        Request synchronization for a task.
+        Args:
+            request: The gRPC message request
+            context: The gRPC context
+        """
+        self.validate_collaborator(request, context)
+        self.check_request(request)
+        collaborator_name = request.header.sender
+        task_name = request.task_name
+        round_number = request.round_number
+        is_completed = self.aggregator.synch(task_name, round_number)
+
+        return SynchResponse(
+            header=self.get_header(collaborator_name),
+            is_completed=is_completed
         )
 
     def SendLocalTaskResults(self, request, context):  # NOQA:N802

@@ -413,7 +413,8 @@ class Plan:
     # Python interactive api
     def get_core_task_runner(self, data_loader=None,
                              model_provider=None,
-                             task_keeper=None):
+                             task_keeper=None,
+                             nn=True):
         """Get task runner."""
         defaults = self.config.get(
             'task_runner',
@@ -421,6 +422,7 @@ class Plan:
                 TEMPLATE: 'openfl.federated.task.task_runner.CoreTaskRunner',
                 SETTINGS: {}
             })
+        defaults['nn'] = nn
 
         # We are importing a CoreTaskRunner instance!!!
         if self.runner_ is None:
@@ -470,7 +472,8 @@ class Plan:
                 defaults[SETTINGS]['task_runner'] = self.get_core_task_runner(
                     data_loader=data_loader,
                     model_provider=model_provider,
-                    task_keeper=task_keeper)
+                    task_keeper=task_keeper,
+                    nn=defaults[SETTINGS]['nn'])
             else:
                 # TaskRunner subclassing API
                 data_loader = self.get_data_loader(collaborator_name)

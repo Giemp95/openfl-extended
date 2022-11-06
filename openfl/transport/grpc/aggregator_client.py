@@ -15,6 +15,7 @@ from openfl.protocols import aggregator_pb2
 from openfl.protocols import aggregator_pb2_grpc
 from openfl.protocols import utils
 from openfl.utilities import check_equal
+from openfl.protocols import SynchRequest
 
 from .grpc_channel_options import channel_options
 
@@ -323,6 +324,37 @@ class AggregatorGRPCClient:
 
         # also do other validation, like on the round_number
         self.validate_response(response, collaborator_name)
+
+    @_atomic_connection
+    @_resend_data_on_reconnection
+    def get_tensor(self, collaborator_name, tensor_name, round_number,
+                   report, tags, require_lossless):
+        """Get tensor from the aggregator."""
+        self._set_header(collaborator_name)
+        request = TensorRequest(
+            header=self.header,
+            tensor_name=tensor_name,
+            round_number=round_number,
+            report=report,
+            tags=tags,
+            require_lossless=require_lossless
+        )
+        response = self.stub.GetTensor(request)
+        # also do other validation, like on the round_number
+        self.validate_response(response, collaborator_name)
+
+        return response.tensor
+
+    @_atomic_connection
+    @_resend_data_on_reconnectiona
+    def synch(self, task_name, round_number, collaborator_name):
+        """Get tasks from the aggregator."""
+        self._set_header(collaborator_name)
+        request = SynchRequest(header=self.header, task_name=task_name, round_number=round_number)
+        response = self.stub.GetSynch(request)
+        self.validate_response(response, collaborator_name)
+
+        return response.is_completed
 
     def _get_trained_model(self, experiment_name, model_type):
         """Get trained model RPC."""

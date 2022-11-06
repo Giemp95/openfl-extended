@@ -28,13 +28,13 @@ class TensorDB:
     collaborator and aggregator has its own TensorDB.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, nn=True) -> None:
         """Initialize."""
         self.tensor_db = pd.DataFrame([], columns=[
             'tensor_name', 'origin', 'round', 'report', 'tags', 'nparray'
         ])
         self._bind_convenience_methods()
-        
+        self.nn = nn
         self.mutex = Lock()
 
     def _bind_convenience_methods(self):
@@ -119,7 +119,13 @@ class TensorDB:
 
         if len(df) == 0:
             return None
-        return np.array(df['nparray'].iloc[0])
+
+        if self.nn:
+            result = np.array(df['nparray'].iloc[0])
+        else:
+            result = df['nparray'].iloc[0]
+
+        return result
 
     def get_aggregated_tensor(self, tensor_key: TensorKey, collaborator_weight_dict: dict,
                               aggregation_function: AggregationFunction
@@ -206,7 +212,21 @@ class TensorDB:
                                            tags)
         self.cache_tensor({tensor_key: agg_nparray})
 
-        return np.array(agg_nparray)
+        if self.nn or 'metric' in tags:
+            result = np.array(agg_nparray)
+        else:
+            result = agg_nparray
+
+        return result
+
+    # @TODO: this is also to be generalised
+    def get_errors(self, round_number):
+        df = self.tensor_db[(self.tensor_db['tensor_name'] == "errors")
+                            & (self.tensor_db['round'] == round_number)]
+
+        if len(df) == 0:
+            return None
+        return df["nparray"].to_numpy()
 
     def _iterate(self, order_by: str = 'round', ascending: bool = False) -> Iterator[pd.Series]:
         columns = ['round', 'nparray', 'tensor_name', 'tags']

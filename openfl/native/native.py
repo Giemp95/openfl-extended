@@ -208,7 +208,7 @@ def init(workspace_template: str = 'default', log_level: str = 'INFO',
     setup_logging(level=log_level, log_file=log_file)
 
 
-def create_collaborator(plan, name, model, aggregator):
+def create_collaborator(plan, name, model, aggregator, nn):
     """
     Create the collaborator.
 
@@ -218,10 +218,10 @@ def create_collaborator(plan, name, model, aggregator):
     """
     plan = copy(plan)
 
-    return plan.get_collaborator(name, task_runner=model, client=aggregator)
+    return plan.get_collaborator(name, task_runner=model, client=aggregator, nn=nn)
 
 
-def run_experiment(collaborator_dict: dict, override_config: dict = None):
+def run_experiment(collaborator_dict: dict, override_config: dict = None, nn: bool = False):
     """
     Core function that executes the FL Plan.
 
@@ -265,18 +265,19 @@ def run_experiment(collaborator_dict: dict, override_config: dict = None):
     # Initialize model weights
     init_state_path = plan.config['aggregator']['settings']['init_state_path']
     rounds_to_train = plan.config['aggregator']['settings']['rounds_to_train']
-    tensor_dict, holdout_params = split_tensor_dict_for_holdouts(
-        logger,
-        model.get_tensor_dict(False)
-    )
+    if nn:
+        tensor_dict, holdout_params = split_tensor_dict_for_holdouts(
+            logger,
+            model.get_tensor_dict(False)
+        )
 
-    model_snap = utils.construct_model_proto(tensor_dict=tensor_dict,
-                                             round_number=0,
-                                             tensor_pipe=tensor_pipe)
+        model_snap = utils.construct_model_proto(tensor_dict=tensor_dict,
+                                                 round_number=0,
+                                                 tensor_pipe=tensor_pipe)
 
-    logger.info(f'Creating Initial Weights File    🠆 {init_state_path}')
+        logger.info(f'Creating Initial Weights File    🠆 {init_state_path}')
 
-    utils.dump_proto(model_proto=model_snap, fpath=init_state_path)
+        utils.dump_proto(model_proto=model_snap, fpath=init_state_path)
 
     logger.info('Starting Experiment...')
 
@@ -285,7 +286,7 @@ def run_experiment(collaborator_dict: dict, override_config: dict = None):
     # Create the collaborators
     collaborators = {
         collaborator: create_collaborator(
-            plan, collaborator, collaborator_dict[collaborator], aggregator
+            plan, collaborator, collaborator_dict[collaborator], aggregator, nn
         ) for collaborator in plan.authorized_cols
     }
 
@@ -295,8 +296,9 @@ def run_experiment(collaborator_dict: dict, override_config: dict = None):
             collaborator.run_simulation()
 
     # Set the weights for the final model
-    model.rebuild_model(
-        rounds_to_train - 1, aggregator.last_tensor_dict, validation=True)
+    if nn:
+        model.rebuild_model(
+            rounds_to_train - 1, aggregator.last_tensor_dict, validation=True)
     return model
 
 

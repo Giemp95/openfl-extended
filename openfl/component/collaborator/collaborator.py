@@ -79,9 +79,12 @@ class Collaborator:
                  delta_updates=False,
                  compression_pipeline=None,
                  db_store_rounds=1,
+                 nn=False,
                  **kwargs):
         """Initialize."""
         self.single_col_cert_common_name = None
+
+        self.nn = nn
 
         if self.single_col_cert_common_name is None:
             self.single_col_cert_common_name = ''  # for protobuf compatibility
@@ -104,6 +107,12 @@ class Collaborator:
         self.task_config = task_config
 
         self.logger = getLogger(__name__)
+
+        if not self.nn:
+            # AdaBoost.F variables
+            self.adaboost_coeff = np.ones(self.task_runner.get_train_data_size())
+            self.model_buffer = None
+            self.errors = []
 
         # RESET/CONTINUE_LOCAL/CONTINUE_GLOBAL
         if hasattr(OptTreatment, opt_treatment):
@@ -204,6 +213,7 @@ class Collaborator:
         # this would return a list of what tensors we require as TensorKeys
         required_tensorkeys_relative = self.task_runner.get_required_tensorkeys_for_function(
             func_name,
+            nn=self.nn,
             **kwargs
         )
 
@@ -252,11 +262,50 @@ class Collaborator:
             func = getattr(self.task_runner, func_name)
             self.logger.info('Using TaskRunner subclassing API')
 
+        # TODO: this should be generalized
+        if not self.nn:
+            if task == '1_train' or task == '2_weak_learners_validate':
+                kwargs['adaboost_coeff'] = self.adaboost_coeff
+
         global_output_tensor_dict, local_output_tensor_dict = func(
             col_name=self.collaborator_name,
             round_num=round_number,
             input_tensor_dict=input_tensor_dict,
             **kwargs)
+
+        # TODO: this should be generalized
+        if not self.nn:
+            if task == '2_weak_learners_validate':
+                self.model_buffer = input_tensor_dict['generic_model']
+                self.errors = optional
+            elif task == '3_adaboost_update':
+                # With this we are
+                input_tensor_dict = input_tensor_dict['generic_model']
+                alpha = input_tensor_dict[0]
+                best_model = int(input_tensor_dict[1])
+
+                self.adaboost_coeff = np.array([self.adaboost_coeff[i] * np.exp(alpha * self.errors[best_model][i])
+                                                for i in range(self.task_runner.get_train_data_size())])
+                adaboost = self.tensor_db.get_tensor_from_cache(TensorKey(
+                    'generic_model',
+                    self.collaborator_name,
+                    round_number - 1,
+                    False,
+                    ('adaboost',)
+                ))
+
+                if adaboost is not None:
+                    adaboost.add(self.model_buffer.get(best_model), alpha)
+                else:
+                    adaboost = self.model_buffer.replace(self.model_buffer.get(best_model), alpha)
+
+                self.tensor_db.cache_tensor({TensorKey(
+                    'generic_model',
+                    self.collaborator_name,
+                    round_number,
+                    False,
+                    ('adaboost',)
+                ): adaboost})
 
         # Save global and local output_tensor_dicts to TensorDB
         self.tensor_db.cache_tensor(global_output_tensor_dict)
@@ -265,6 +314,16 @@ class Collaborator:
         # send the results for this tasks; delta and compression will occur in
         # this function
         self.send_task_results(global_output_tensor_dict, round_number, task_name)
+
+        # Synchronisation point for AdaBoost.F
+        # TODO: this should be applied only if the next task is GLOBAL
+        if not self.nn:
+            while not self.synch(task, round_number, self.collaborator_name):
+                sleep(0.5)
+
+    def synch(self, task_name, round_number, collaborator_name):
+        self.logger.info('Waiting for global task completion...')
+        return self.client.synch(task_name, round_number, collaborator_name)
 
     def get_numpy_dict_for_tensorkeys(self, tensor_keys):
         """Get tensor dictionary for specified tensorkey set."""
@@ -281,8 +340,32 @@ class Collaborator:
         """
         # try to get from the store
         tensor_name, origin, round_number, report, tags = tensor_key
-        self.logger.debug(f'Attempting to retrieve tensor {tensor_key} from local store')
-        nparray = self.tensor_db.get_tensor_from_cache(tensor_key)
+
+        if self.nn:
+            self.logger.debug(f'Attempting to retrieve tensor {tensor_key} from local store')
+            nparray = self.tensor_db.get_tensor_from_cache(tensor_key)
+        else:
+            nparray = None
+            if 'model' in tags:
+                # Pulling the model for the first time
+                # TODO: maybe this is not useful anymore
+                nparray = self.get_aggregated_tensor_from_aggregator(
+                    tensor_key,
+                    require_lossless=True
+                )
+            # These tags are specific to AdaBoost.F
+            elif 'weak_learner' in tags:
+                nparray = self.get_tensor_from_aggregator(
+                    tensor_key,
+                    require_lossless=True,
+                    aggregate=False
+                )
+            elif 'adaboost_coeff' in tags:
+                nparray = self.get_tensor_from_aggregator(
+                    tensor_key,
+                    require_lossless=True,
+                    aggregate=False
+                )
 
         # if None and origin is our client, request it from the client
         if nparray is None:
@@ -349,8 +432,8 @@ class Collaborator:
 
         return nparray
 
-    def get_aggregated_tensor_from_aggregator(self, tensor_key,
-                                              require_lossless=False):
+    def get_tensor_from_aggregator(self, tensor_key,
+                                              require_lossless=False, aggregate=True):
         """
         Return the decompressed tensor associated with the requested tensor key.
 
@@ -376,9 +459,9 @@ class Collaborator:
         """
         tensor_name, origin, round_number, report, tags = tensor_key
 
-        self.logger.debug(f'Requesting aggregated tensor {tensor_key}')
-        tensor = self.client.get_aggregated_tensor(
-            self.collaborator_name, tensor_name, round_number, report, tags, require_lossless)
+        self.logger.debug(f'Requesting tensor {tensor_key}')
+        tensor = self.client.get_tensor(
+            self.collaborator_name, tensor_name, round_number, report, tags, require_lossless, aggregate)
 
         # this translates to a numpy array and includes decompression, as
         # necessary
@@ -483,10 +566,17 @@ class Collaborator:
         # do the stuff we do now for decompression and frombuffer and stuff
         # This should probably be moved back to protoutils
         raw_bytes = named_tensor.data_bytes
-        metadata = [{'int_to_float': proto.int_to_float,
-                     'int_list': proto.int_list,
-                     'bool_list': proto.bool_list
-                     } for proto in named_tensor.transformer_metadata]
+        if self.nn:
+            metadata = [{'int_to_float': proto.int_to_float,
+                         'int_list': proto.int_list,
+                         'bool_list': proto.bool_list
+                         } for proto in named_tensor.transformer_metadata]
+        else:
+            metadata = [{'int_to_float': proto.int_to_float,
+                         'int_list': proto.int_list,
+                         'bool_list': proto.bool_list,
+                         'model': proto.model,
+                         } for proto in named_tensor.transformer_metadata]
         # The tensor has already been transfered to collaborator, so
         # the newly constructed tensor should have the collaborator origin
         tensor_key = TensorKey(

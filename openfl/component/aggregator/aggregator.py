@@ -52,10 +52,13 @@ class Aggregator:
                  compression_pipeline=None,
                  db_store_rounds=1,
                  write_logs=False,
+                 nn=False,
                  **kwargs):
         """Initialize."""
         self.round_number = 0
         self.single_col_cert_common_name = single_col_cert_common_name
+
+        self.nn = nn
 
         if self.single_col_cert_common_name is not None:
             self._log_big_warning()
@@ -153,8 +156,10 @@ class Aggregator:
         Returns:
             None
         """
+        # This could be changed to the same name for both cases
+        key = ('model',) if self.nn else ('weak_learner',)
         tensor_key_dict = {
-            TensorKey(k, self.uuid, self.round_number, False, ('model',)):
+            TensorKey(k, self.uuid, self.round_number, False, key):
                 v for k, v in tensor_dict.items()
         }
         # all initial model tensors are loaded here
@@ -332,8 +337,8 @@ class Aggregator:
 
         return tasks, self.round_number, sleep_time, time_to_quit
 
-    def get_aggregated_tensor(self, collaborator_name, tensor_name,
-                              round_number, report, tags, require_lossless):
+    def get_tensor(self, collaborator_name, tensor_name,
+                              round_number, report, tags, require_lossless, aggregated=True):
         """
         RPC called by collaborator.
 
@@ -368,9 +373,17 @@ class Aggregator:
         if 'lossy_compressed' in tags:
             tags = change_tags(tags, remove_field='lossy_compressed')
 
-        tensor_key = TensorKey(
-            tensor_name, self.uuid, round_number, report, tags
-        )
+        if aggregated:
+            tensor_key = TensorKey(
+                tensor_name, self.uuid, round_number, report, tags
+            )
+        else:
+            # TODO: this should be more clear
+            # AdaBoost.F TensorKey handling
+            tensor_key = TensorKey(
+                'errors' if 'adaboost_coeff' in tags else tensor_name, self.uuid,
+                0 if 'weak_learner' in tags else round_number, True if 'adaboost_coeff' in tags else report, tuple(tags)
+            )
         tensor_name, origin, round_number, report, tags = tensor_key
 
         if 'aggregated' in tags and 'delta' in tags and round_number != 0:
@@ -396,7 +409,7 @@ class Aggregator:
         # quite a bit happens in here, including compression, delta handling,
         # etc...
         # we might want to cache these as well
-        named_tensor = self._nparray_to_named_tensor(
+        named_tensor = self.a(
             agg_tensor_key,
             nparray,
             send_model_deltas=True,
@@ -541,7 +554,10 @@ class Aggregator:
                 named_tensor, collaborator_name
             )
             if 'metric' in tensor_key.tags:
-                metric_value = nparray.item()
+                if isinstance(nparray, np.ndarray):
+                    metric_value = nparray.tolist()
+                    if not isinstance(nparray, list):
+                        metric_value = [nparray]
                 metric_dict = {
                     'metric_origin': tensor_key.tags[-1],
                     'task_name': task_name,
@@ -568,6 +584,10 @@ class Aggregator:
 
         self._end_of_task_check(task_name)
 
+    def synch(self, task_name, round_number):
+        result = self._is_task_done(task_name, round_number)
+        return result
+
     def _process_named_tensor(self, named_tensor, collaborator_name):
         """
         Extract the named tensor fields.
@@ -588,10 +608,18 @@ class Aggregator:
                 The numpy array associated with the returned tensorkey
         """
         raw_bytes = named_tensor.data_bytes
-        metadata = [{'int_to_float': proto.int_to_float,
-                     'int_list': proto.int_list,
-                     'bool_list': proto.bool_list}
-                    for proto in named_tensor.transformer_metadata]
+        if self.nn:
+            metadata = [{'int_to_float': proto.int_to_float,
+                         'int_list': proto.int_list,
+                         'bool_list': proto.bool_list}
+                        for proto in named_tensor.transformer_metadata]
+        else:
+            metadata = [{'int_to_float': proto.int_to_float,
+                         'int_list': proto.int_list,
+                         'bool_list': proto.bool_list,
+                         'model': proto.model}
+                        for proto in named_tensor.transformer_metadata]
+
         # The tensor has already been transfered to aggregator,
         # so the newly constructed tensor should have the aggregator origin
         tensor_key = TensorKey(
@@ -710,7 +738,7 @@ class Aggregator:
             ('model',)
         )
         base_model_nparray = self.tensor_db.get_tensor_from_cache(base_model_tk)
-        if base_model_nparray is not None:
+        if self.nn and base_model_nparray is not None:
             delta_tk, delta_nparray = self.tensor_codec.generate_delta(
                 agg_tag_tk,
                 agg_results,
@@ -743,7 +771,7 @@ class Aggregator:
         self.tensor_db.cache_tensor({decompressed_delta_tk: decompressed_delta_nparray})
 
         # Apply delta (unless delta couldn't be created)
-        if base_model_nparray is not None:
+        if self.nn and base_model_nparray is not None:
             self.logger.debug(f'Applying delta for layer {decompressed_delta_tk[0]}')
             new_model_tk, new_model_nparray = self.tensor_codec.apply_delta(
                 decompressed_delta_tk,
@@ -817,11 +845,16 @@ class Aggregator:
             new_tags = change_tags(tags, remove_field=collaborators_for_task[0])
             agg_tensor_key = TensorKey(tensor_name, origin, round_number, report, new_tags)
             agg_tensor_name, agg_origin, agg_round_number, agg_report, agg_tags = agg_tensor_key
-            agg_function = WeightedAverage() if 'metric' in tags else task_agg_function
+            # TODO: This if can be removed (maybe) (with a well-configurated plan)
+            agg_function = task_agg_function if task_name == '2_weak_learners_validate' else WeightedAverage() if 'metric' in tags else task_agg_function
             agg_results = self.tensor_db.get_aggregated_tensor(
                 agg_tensor_key, collaborator_weight_dict, aggregation_function=agg_function)
             if report:
                 # Print the aggregated metric
+                if isinstance(agg_results, np.ndarray):
+                    agg_results = agg_results.tolist()
+                    if not isinstance(agg_results, list):
+                        agg_results = [agg_results]
                 metric_dict = {
                     'metric_origin': 'Aggregator',
                     'task_name': task_name,
@@ -844,20 +877,25 @@ class Aggregator:
                                     tensor_key.tensor_name,
                                     agg_results, round_number)
                 self.metric_queue.put(metric_dict)
-                # TODO Add all of the logic for saving the model based
-                #  on best accuracy, lowest loss, etc.
-                if 'validate_agg' in tags:
-                    # Compare the accuracy of the model, and
-                    # potentially save it
-                    if self.best_model_score is None or self.best_model_score < agg_results:
-                        self.logger.metric(f'Round {round_number}: saved the best '
-                                           f'model with score {agg_results:f}')
-                        self.best_model_score = agg_results
-                        self._save_model(round_number, self.best_state_path)
+                # TODO: This is disabled for non DNN models since it is in conflict with the exchange of arrays of metrics
+                if self.nn:
+                    # TODO Add all of the logic for saving the model based
+                    #  on best accuracy, lowest loss, etc.
+                    if 'validate_agg' in tags:
+                        # Compare the accuracy of the model, and
+                        # potentially save it
+                        if self.best_model_score is None or self.best_model_score < agg_results:
+                            self.logger.metric(f'Round {round_number}: saved the best '
+                                               f'model with score {agg_results:f}')
+                            self.best_model_score = agg_results
+                            self._save_model(round_number, self.best_state_path)
             if 'trained' in tags:
                 self._prepare_trained(tensor_name, origin, round_number, report, agg_results)
+            # TODO: generalize this possibly
+            if task_name == '2_weak_learners_validate':
+                self._prepare_adaboost(tensor_name, origin, round_number, report, agg_results)
 
-    def _end_of_round_check(self):
+    def _end_of_round_check(self, task_name=None):
         """
         Check if the round complete.
 
@@ -871,13 +909,20 @@ class Aggregator:
         Returns:
             None
         """
+        if not self.nn:
+            if task_name is not None:
+                self._compute_validation_related_task_metrics(task_name)
+            else:
+                self.logger.info('No task name provided, no metric can be computed')
+
         if not self._is_round_done() or self._end_of_round_check_done[self.round_number]:
             return
 
         # Compute all validation related metrics
-        all_tasks = self.assigner.get_all_tasks_for_round(self.round_number)
-        for task_name in all_tasks:
-            self._compute_validation_related_task_metrics(task_name)
+        if self.nn:
+            all_tasks = self.assigner.get_all_tasks_for_round(self.round_number)
+            for task_name in all_tasks:
+                self._compute_validation_related_task_metrics(task_name)
 
         # Once all of the task results have been processed
         self._end_of_round_check_done[self.round_number] = True
@@ -898,16 +943,20 @@ class Aggregator:
         # Cleaning tensor db
         self.tensor_db.clean_up(self.db_store_rounds)
 
-    def _is_task_done(self, task_name):
+    def _is_task_done(self, task_name, round_number=None):
         """Check that task is done."""
+
+        if round_number is None:
+            round_number=self.round_number
+
         all_collaborators = self.assigner.get_collaborators_for_task(
-            task_name, self.round_number
+            task_name, round_number
         )
         
         collaborators_done = []
         for c in all_collaborators:
             if self._collaborator_task_completed(
-                c, task_name, self.round_number):
+                c, task_name, round_number):
                 collaborators_done.append(c)
         
         straggler_check = self.straggler_handling_policy.straggler_cutoff_check(
@@ -941,6 +990,34 @@ class Aggregator:
             f'SHOULD ONLY BE USED IN DEVELOPMENT SETTINGS!!!! YE HAVE BEEN'
             f' WARNED!!!'
         )
+
+    def _prepare_adaboost(self, tensor_name, origin, round_number, report, agg_results):
+        """
+        Prepare aggregated tensorkey tags for adaboost.
+        Args:
+           tensor_name : str
+           origin:
+           round_number: int
+           report: bool
+           agg_results: np.array
+        """
+        # The aggregated tensorkey tags should have the form of
+        # 'trained' or 'trained.lossy_decompressed'
+        # They need to be relabeled to 'aggregated' and
+        # reinserted. Then delta performed, compressed, etc.
+        # then reinserted to TensorDB with 'model' tag
+
+        # First insert the aggregated model layer with the
+        # correct tensorkey
+        agg_tag_tk = TensorKey(
+            tensor_name,
+            origin,
+            round_number,
+            report,
+            ('adaboost_coeff',)
+        )
+
+        self.tensor_db.cache_tensor({agg_tag_tk: agg_results})
 
     def stop(self, failed_collaborator: str = None) -> None:
         """Stop aggregator execution."""

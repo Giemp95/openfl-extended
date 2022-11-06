@@ -185,6 +185,7 @@ class FLExperiment:
               delta_updates: bool = False,
               opt_treatment: str = 'RESET',
               device_assignment_policy: str = 'CPU_ONLY',
+              nn=True,
               pip_install_options: Tuple[str] = ()) -> None:
         """
         Prepare workspace distribution and send to Director.
@@ -231,7 +232,7 @@ class FLExperiment:
 
         self.logger.info('Starting experiment!')
         self.plan.resolve()
-        initial_tensor_dict = self._get_initial_tensor_dict(model_provider)
+        initial_tensor_dict = self._get_initial_tensor_dict(model_provider, nn)
         try:
             response = self.federation.dir_client.set_new_experiment(
                 name=self.experiment_name,
@@ -328,9 +329,9 @@ class FLExperiment:
         os.remove(self.arch_path)
         del self.arch_path
 
-    def _get_initial_tensor_dict(self, model_provider):
+    def _get_initial_tensor_dict(self, model_provider, nn):
         """Extract initial weights from the model."""
-        self.task_runner_stub = self.plan.get_core_task_runner(model_provider=model_provider)
+        self.task_runner_stub = self.plan.get_core_task_runner(model_provider=model_provider, nn=nn)
         self.current_model_status = ModelStatus.INITIAL
         tensor_dict, _ = split_tensor_dict_for_holdouts(
             self.logger,
@@ -456,7 +457,8 @@ class TaskKeeper:
         # Mapping 'task_alias' -> Task
         self._tasks: Dict[str, Task] = {}
 
-    def register_fl_task(self, model, data_loader, device, optimizer=None, round_num=None):
+    # TODO: maybe in case of AdaBoost.F the adaboost_coeff could be storend in the optimizer parameter
+    def register_fl_task(self, model, data_loader, device, optimizer=None, round_num=None, adaboost_coeff=None):
         """
         Register FL tasks.
 
@@ -493,8 +495,13 @@ class TaskKeeper:
             # Saving the task and the contract for later serialization
             function_name = training_method.__name__
             self.task_registry[function_name] = wrapper_decorator
-            contract = {'model': model, 'data_loader': data_loader,
-                        'device': device, 'optimizer': optimizer, 'round_num': round_num}
+            if adaboost_coeff is None:
+                contract = {'model': model, 'data_loader': data_loader,
+                            'device': device, 'optimizer': optimizer, 'round_num': round_num}
+            else:
+                contract = {'model': model, 'data_loader': data_loader,
+                            'device': device, 'optimizer': optimizer, 'round_num': round_num,
+                            'adaboost_coeff': adaboost_coeff}
             self.task_contract[function_name] = contract
             # define tasks
             if optimizer:

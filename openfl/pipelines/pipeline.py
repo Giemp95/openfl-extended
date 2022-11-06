@@ -4,7 +4,7 @@
 """Pipeline module."""
 
 import numpy as np
-
+from dill import dumps, loads
 
 class Transformer:
     """Data transformation class."""
@@ -44,9 +44,10 @@ class Transformer:
 class Float32NumpyArrayToBytes(Transformer):
     """Converts float32 Numpy array to Bytes array."""
 
-    def __init__(self):
+    def __init__(self, nn=True):
         """Initialize."""
         self.lossy = False
+        self.nn = nn
 
     def forward(self, data, **kwargs):
         """Forward pass.
@@ -60,12 +61,17 @@ class Float32NumpyArrayToBytes(Transformer):
             metadata:
         """
         # TODO: Warn when this casting is being performed.
-        if data.dtype != np.float32:
-            data = data.astype(np.float32)
-        array_shape = data.shape
-        # Better call it array_shape?
-        metadata = {'int_list': list(array_shape)}
-        data_bytes = data.tobytes(order='C')
+        if self.nn or isinstance(data, np.ndarray):
+            if data.dtype != np.float32:
+                data = data.astype(np.float32)
+            array_shape = data.shape
+            # Better call it array_shape?
+            metadata = {'int_list': list(array_shape)}
+            data_bytes = data.tobytes(order='C')
+        else:
+            data_bytes = dumps(data)
+            metadata = {'model': True}
+
         return data_bytes, metadata
 
     def backward(self, data, metadata, **kwargs):
@@ -79,11 +85,16 @@ class Float32NumpyArrayToBytes(Transformer):
             Numpy Array
 
         """
-        array_shape = tuple(metadata['int_list'])
-        flat_array = np.frombuffer(data, dtype=np.float32)
-        # For integer parameters we probably should unpack arrays
-        # with shape (1,)
-        return np.reshape(flat_array, newshape=array_shape, order='C')
+        if not metadata['model']:
+            array_shape = tuple(metadata['int_list'])
+            flat_array = np.frombuffer(data, dtype=np.float32)
+            # For integer parameters we probably should unpack arrays
+            # with shape (1,)
+            result = np.reshape(flat_array, newshape=array_shape, order='C')
+        else:
+            result = loads(data)
+
+        return result
 
 
 class TransformationPipeline:
@@ -94,7 +105,8 @@ class TransformationPipeline:
     reconstruction process carried out by the backward method.
     """
 
-    def __init__(self, transformers, **kwargs):
+    # TODO: maybe put nn in **kwargs
+    def __init__(self, transformers, nn=True, **kwargs):
         """Initialize.
 
         Args:
@@ -102,6 +114,7 @@ class TransformationPipeline:
             **kwargs: Additional parameters to pass to the function
         """
         self.transformers = transformers
+        self.nn = nn
 
     def forward(self, data, **kwargs):
         """Forward pass of pipeline data transformer.
@@ -129,7 +142,9 @@ class TransformationPipeline:
         # input:: (data(bytes), transformer_metadata_list::a list of dictionary
         # from int to float)
 
-        data = data.copy()
+        if self.nn or isinstance(data, np.ndarray):
+            data = data.copy()
+            
         for transformer in self.transformers:
             data, metadata = transformer.forward(data=data, **kwargs)
             transformer_metadata.append(metadata)

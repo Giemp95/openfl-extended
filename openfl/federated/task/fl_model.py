@@ -25,7 +25,7 @@ class FederatedModel(TaskRunner):
         loss_fn : pytorch loss_fun (only required for pytorch)
     """
 
-    def __init__(self, build_model, optimizer=None, loss_fn=None, **kwargs):
+    def __init__(self, build_model,  nn=False, optimizer=None, loss_fn=None, **kwargs):
         """Initialize.
 
         Args:
@@ -35,36 +35,43 @@ class FederatedModel(TaskRunner):
         """
         super().__init__(**kwargs)
 
-        self.build_model = build_model
-        self.lambda_opt = None
-        # TODO pass params to model
-        if inspect.isclass(build_model):
-            self.model = build_model()
-            from .runner_pt import PyTorchTaskRunner
-            if optimizer is not None:
-                self.optimizer = optimizer(self.model.parameters())
-            self.runner = PyTorchTaskRunner(**kwargs)
-            if hasattr(self.model, 'forward'):
-                self.runner.forward = self.model.forward
+        if nn:
+            self.build_model = build_model
+            self.lambda_opt = None
+            # TODO pass params to model
+            if inspect.isclass(build_model):
+                self.model = build_model()
+                from .runner_pt import PyTorchTaskRunner
+                if optimizer is not None:
+                    self.optimizer = optimizer(self.model.parameters())
+                self.runner = PyTorchTaskRunner(**kwargs)
+                if hasattr(self.model, 'forward'):
+                    self.runner.forward = self.model.forward
+            else:
+                self.model = self.build_model(
+                    self.feature_shape, self.data_loader.num_classes)
+                from .runner_keras import KerasTaskRunner
+                self.runner = KerasTaskRunner(**kwargs)
+                self.optimizer = self.model.optimizer
+            self.lambda_opt = optimizer
+            if hasattr(self.model, 'validate'):
+                self.runner.validate = lambda *args, **kwargs: build_model.validate(
+                    self.runner, *args, **kwargs)
+            if hasattr(self.model, 'train_epoch'):
+                self.runner.train_epoch = lambda *args, **kwargs: build_model.train_epoch(
+                    self.runner, *args, **kwargs)
+            self.runner.model = self.model
+            self.runner.optimizer = self.optimizer
+            self.loss_fn = loss_fn
+            self.runner.loss_fn = self.loss_fn
+            self.tensor_dict_split_fn_kwargs = self.runner.tensor_dict_split_fn_kwargs
+            self.initialize_tensorkeys_for_functions()
         else:
-            self.model = self.build_model(
-                self.feature_shape, self.data_loader.num_classes)
-            from .runner_keras import KerasTaskRunner
-            self.runner = KerasTaskRunner(**kwargs)
-            self.optimizer = self.model.optimizer
-        self.lambda_opt = optimizer
-        if hasattr(self.model, 'validate'):
-            self.runner.validate = lambda *args, **kwargs: build_model.validate(
-                self.runner, *args, **kwargs)
-        if hasattr(self.model, 'train_epoch'):
-            self.runner.train_epoch = lambda *args, **kwargs: build_model.train_epoch(
-                self.runner, *args, **kwargs)
-        self.runner.model = self.model
-        self.runner.optimizer = self.optimizer
-        self.loss_fn = loss_fn
-        self.runner.loss_fn = self.loss_fn
-        self.tensor_dict_split_fn_kwargs = self.runner.tensor_dict_split_fn_kwargs
-        self.initialize_tensorkeys_for_functions()
+            self.lambda_opt = None
+            self.loss_fn = None
+            self.model = build_model()
+            from .runner_generic import GenericTaskRunner
+            self.runner = GenericTaskRunner(model=self.model, **kwargs)
 
     def __getattribute__(self, attr):
         """Direct call into self.runner methods if necessary."""

@@ -11,7 +11,7 @@ from typing import Type
 import grpc
 
 from openfl.interface.interactive_api.shard_descriptor import ShardDescriptor
-from openfl.pipelines import NoCompressionPipeline
+from openfl.pipelines import NoCompressionPipeline, GenericPipelined
 from openfl.protocols import director_pb2
 from openfl.protocols import director_pb2_grpc
 from openfl.protocols import interceptors
@@ -201,7 +201,7 @@ class DirectorClient:
         """Send the new experiment to director to launch."""
         logger.info('SetNewExperiment')
         if initial_tensor_dict:
-            model_proto = construct_model_proto(initial_tensor_dict, 0, NoCompressionPipeline())
+            model_proto = construct_model_proto(initial_tensor_dict, 0, GenericPipeline())
             experiment_info_gen = self._get_experiment_info(
                 arch_path=arch_path,
                 name=name,
