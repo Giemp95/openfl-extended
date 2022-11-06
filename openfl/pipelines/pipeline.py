@@ -144,7 +144,7 @@ class TransformationPipeline:
 
         if self.nn or isinstance(data, np.ndarray):
             data = data.copy()
-            
+
         for transformer in self.transformers:
             data, metadata = transformer.forward(data=data, **kwargs)
             transformer_metadata.append(metadata)
