@@ -10,7 +10,8 @@ import "openfl/protocols/base.proto";
 
 service Aggregator {
   rpc GetTasks(GetTasksRequest) returns (GetTasksResponse) {}
-  rpc GetAggregatedTensor(GetAggregatedTensorRequest) returns (GetAggregatedTensorResponse) {}
+  rpc GetSynch(SynchRequest) returns (SynchResponse) {}
+  rpc GetTensor(GetTensorRequest) returns (GetTensorResponse) {}
   rpc SendLocalTaskResults(stream DataStream) returns (SendLocalTaskResultsResponse) {}
   rpc GetMetricStream(GetMetricStreamRequest) returns (stream GetMetricStreamResponse) {}
   rpc GetTrainedModel(GetTrainedModelRequest) returns (TrainedModelResponse) {}
@@ -45,7 +46,7 @@ message GetTasksResponse {
   bool quit = 5;  // these three are exclusive
 }
 
-message GetAggregatedTensorRequest {
+message GetTensorRequest {
   MessageHeader header = 1;
   string tensor_name = 2;
   int32 round_number = 3;
@@ -55,7 +56,7 @@ message GetAggregatedTensorRequest {
 }
 
 // we'll actually send this as a data stream
-message GetAggregatedTensorResponse {
+message GetTensorResponse {
   MessageHeader header = 1;
   int32 round_number = 2;
   NamedTensor tensor = 3;
@@ -111,4 +112,15 @@ message GetExperimentDescriptionRequest {
 // The same with director.proto
 message GetExperimentDescriptionResponse {
   ExperimentDescription experiment = 1;
+}
+
+message SynchRequest {
+    required MessageHeader header = 1;
+    required string task_name = 2;
+    required int32 round_number=3;
+}
+
+message SynchResponse {
+    required MessageHeader  header       = 1;
+    required bool           is_completed = 2;
 }
