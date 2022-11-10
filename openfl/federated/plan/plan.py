@@ -255,39 +255,40 @@ class Plan:
                 self.hash[:8], 16
             ) % (60999 - 49152) + 49152
 
+    # TODO: this should be reintroduced
     def get_assigner(self):
         """Get the plan task assigner."""
-        aggregation_functions_by_task = None
-        assigner_function = None
-        try:
-            aggregation_functions_by_task = self.restore_object('aggregation_function_obj.pkl')
-            assigner_function = self.restore_object('task_assigner_obj.pkl')
-        except Exception as exc:
-            self.logger.error(f'Failed to load aggregation and assigner functions: {exc}')
-            self.logger.info('Using Task Runner API workflow')
-        if assigner_function:
-            self.assigner_ = Assigner(
-                assigner_function=assigner_function,
-                aggregation_functions_by_task=aggregation_functions_by_task,
-                authorized_cols=self.authorized_cols,
-                rounds_to_train=self.rounds_to_train,
-            )
-        else:
-            # Backward compatibility
-            defaults = self.config.get(
-                'assigner',
-                {
-                    TEMPLATE: 'openfl.component.Assigner',
-                    SETTINGS: {}
-                }
-            )
+        #aggregation_functions_by_task = None
+        #assigner_function = None
+        #try:
+        #    aggregation_functions_by_task = self.restore_object('aggregation_function_obj.pkl')
+        #    assigner_function = self.restore_object('task_assigner_obj.pkl')
+        #except Exception as exc:
+        #    self.logger.error(f'Failed to load aggregation and assigner functions: {exc}')
+        #    self.logger.info('Using Task Runner API workflow')
+        #if assigner_function:
+        #    self.assigner_ = Assigner(
+        #        assigner_function=assigner_function,
+        #        aggregation_functions_by_task=aggregation_functions_by_task,
+        #        authorized_cols=self.authorized_cols,
+        #        rounds_to_train=self.rounds_to_train,
+        #    )
+        #else:
+        # Backward compatibility
+        defaults = self.config.get(
+            'assigner',
+            {
+                TEMPLATE: 'openfl.component.Assigner',
+                SETTINGS: {}
+            }
+        )
 
-            defaults[SETTINGS]['authorized_cols'] = self.authorized_cols
-            defaults[SETTINGS]['rounds_to_train'] = self.rounds_to_train
-            defaults[SETTINGS]['tasks'] = self.get_tasks()
+        defaults[SETTINGS]['authorized_cols'] = self.authorized_cols
+        defaults[SETTINGS]['rounds_to_train'] = self.rounds_to_train
+        defaults[SETTINGS]['tasks'] = self.get_tasks()
 
-            if self.assigner_ is None:
-                self.assigner_ = Plan.build(**defaults)
+        if self.assigner_ is None:
+            self.assigner_ = Plan.build(**defaults)
 
         return self.assigner_
 
@@ -411,6 +412,7 @@ class Plan:
         return self.runner_
 
     # Python interactive api
+    # TODO: remove nn from the parameters
     def get_core_task_runner(self, data_loader=None,
                              model_provider=None,
                              task_keeper=None,
@@ -461,11 +463,13 @@ class Plan:
             defaults[SETTINGS]['task_runner'] = task_runner
         else:
             # Here we support new interactive api as well as old task_runner subclassing interface
-            # If Task Runner class is placed incide openfl `task-runner` subpackage it is
+            # If Task Runner class is placed inside openfl `task-runner` subpackage it is
             # a part of the New API and it is a part of OpenFL kernel.
             # If Task Runner is placed elsewhere, somewhere in user workspace, than it is
             # a part of the old interface and we follow legacy initialization procedure.
-            if 'openfl.federated.task.task_runner' in self.config['task_runner']['template']:
+            # TODO: this switch for AdaBoost shoulf be implemented in a better way
+            if 'openfl.federated.task.task_runner' in self.config['task_runner']['template']\
+                    or 'openfl.federated.task.runner_generic.GenericTaskRunner' in self.config['task_runner']['template']:
                 # Interactive API
                 model_provider, task_keeper, data_loader = self.deserialize_interface_objects()
                 data_loader = self.initialize_data_loader(data_loader, shard_descriptor)

@@ -85,7 +85,7 @@ class Float32NumpyArrayToBytes(Transformer):
             Numpy Array
 
         """
-        if not metadata['model']:
+        if 'model' not in metadata or not metadata['model']:
             array_shape = tuple(metadata['int_list'])
             flat_array = np.frombuffer(data, dtype=np.float32)
             # For integer parameters we probably should unpack arrays
@@ -142,7 +142,7 @@ class TransformationPipeline:
         # input:: (data(bytes), transformer_metadata_list::a list of dictionary
         # from int to float)
 
-        if self.nn or isinstance(data, np.ndarray):
+        if self.nn:
             data = data.copy()
 
         for transformer in self.transformers:

@@ -1,4 +1,4 @@
-from openfl.component.aggregation_functions.interface import AggregationFunction
+from openfl.interface.aggregation_functions import AggregationFunction
 
 
 class AggregateRandomForest(AggregationFunction):

@@ -53,6 +53,7 @@ message GetTensorRequest {
   bool report = 4;
   repeated string	tags = 5;
   bool require_lossless = 6;
+  bool aggregated = 7;
 }
 
 // we'll actually send this as a data stream
@@ -115,12 +116,12 @@ message GetExperimentDescriptionResponse {
 }
 
 message SynchRequest {
-    required MessageHeader header = 1;
-    required string task_name = 2;
-    required int32 round_number=3;
+    MessageHeader header = 1;
+    string task_name = 2;
+    int32 round_number=3;
 }
 
 message SynchResponse {
-    required MessageHeader  header       = 1;
-    required bool           is_completed = 2;
+    MessageHeader  header       = 1;
+    bool           is_completed = 2;
 }

@@ -1,21 +1,23 @@
 # Copyright (C) 2020-2021 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-"""Aggregator module.""" 
-import time
+"""Aggregator module."""
 import queue
+import time
 from logging import getLogger
 
-from openfl.interface.aggregation_functions import WeightedAverage
+import numpy as np
+
 from openfl.component.straggler_handling_functions import CutoffTimeBasedStragglerHandling
 from openfl.databases import TensorDB
-from openfl.pipelines import NoCompressionPipeline
+from openfl.interface.aggregation_functions import WeightedAverage
+from openfl.pipelines import NoCompressionPipeline, GenericPipeline
 from openfl.pipelines import TensorCodec
 from openfl.protocols import base_pb2
 from openfl.protocols import utils
-from openfl.utilities import change_tags
 from openfl.utilities import TaskResultKey
 from openfl.utilities import TensorKey
+from openfl.utilities import change_tags
 from openfl.utilities.logs import write_metric
 
 
@@ -52,7 +54,7 @@ class Aggregator:
                  compression_pipeline=None,
                  db_store_rounds=1,
                  write_logs=False,
-                 nn=False,
+                 nn=True,
                  **kwargs):
         """Initialize."""
         self.round_number = 0
@@ -80,7 +82,7 @@ class Aggregator:
         self.assigner = assigner
         self.quit_job_sent_to = []
 
-        self.tensor_db = TensorDB()
+        self.tensor_db = TensorDB(self.nn)
         # FIXME: I think next line generates an error on the second round
         # if it is set to 1 for the aggregator.
         self.db_store_rounds = db_store_rounds
@@ -93,7 +95,11 @@ class Aggregator:
         self.best_model_score = None
         self.metric_queue = queue.Queue()
 
-        self.compression_pipeline = compression_pipeline or NoCompressionPipeline()
+        if self.nn:
+            self.compression_pipeline = compression_pipeline or NoCompressionPipeline()
+        else:
+            self.compression_pipeline = GenericPipeline(self.nn)
+
         self.tensor_codec = TensorCodec(self.compression_pipeline)
 
         self.init_state_path = init_state_path
@@ -338,7 +344,7 @@ class Aggregator:
         return tasks, self.round_number, sleep_time, time_to_quit
 
     def get_tensor(self, collaborator_name, tensor_name,
-                              round_number, report, tags, require_lossless, aggregated=True):
+                   round_number, report, tags, require_lossless, aggregated=True):
         """
         RPC called by collaborator.
 
@@ -357,7 +363,7 @@ class Aggregator:
             named_tensor : protobuf NamedTensor
                 the tensor requested by the collaborator
         """
-        self.logger.debug(f'Retrieving aggregated tensor {tensor_name},{round_number},{tags} '
+        self.logger.debug(f'Retrieving tensor {tensor_name},{round_number},{tags} '
                           f'for collaborator {collaborator_name}')
 
         if 'compressed' in tags or require_lossless:
@@ -374,10 +380,14 @@ class Aggregator:
             tags = change_tags(tags, remove_field='lossy_compressed')
 
         if aggregated:
+            self.logger.debug(f'Retrieving aggregated tensor {tensor_name},{round_number},{tags} '
+                              f'for collaborator {collaborator_name}')
             tensor_key = TensorKey(
                 tensor_name, self.uuid, round_number, report, tags
             )
         else:
+            self.logger.debug(f'Retrieving tensor {tensor_name},{round_number},{tags} '
+                              f'for collaborator {collaborator_name}')
             # TODO: this should be more clear
             # AdaBoost.F TensorKey handling
             tensor_key = TensorKey(
@@ -396,8 +406,9 @@ class Aggregator:
         nparray = self.tensor_db.get_tensor_from_cache(agg_tensor_key)
 
         start_retrieving_time = time.time()
-        while(nparray is None):
+        while (nparray is None):
             self.logger.debug(f'Waiting for tensor_key {agg_tensor_key}')
+            self.logger.debug(f'This is tensor_db: {self.tensor_db}')
             time.sleep(5)
             nparray = self.tensor_db.get_tensor_from_cache(agg_tensor_key)
             if (time.time() - start_retrieving_time) > 60:
@@ -409,7 +420,7 @@ class Aggregator:
         # quite a bit happens in here, including compression, delta handling,
         # etc...
         # we might want to cache these as well
-        named_tensor = self.a(
+        named_tensor = self._nparray_to_named_tensor(
             agg_tensor_key,
             nparray,
             send_model_deltas=True,
@@ -463,7 +474,7 @@ class Aggregator:
             compressed_tensor_key, compressed_nparray, metadata = self.tensor_codec.compress(
                 tensor_key,
                 nparray,
-                require_lossless=True
+                require_lossless=True,
             )
             named_tensor = utils.construct_named_tensor(
                 compressed_tensor_key,
@@ -554,24 +565,25 @@ class Aggregator:
                 named_tensor, collaborator_name
             )
             if 'metric' in tensor_key.tags:
-                if isinstance(nparray, np.ndarray):
-                    metric_value = nparray.tolist()
-                    if not isinstance(nparray, list):
-                        metric_value = [nparray]
+                if self.nn:
+                    nparray = nparray.item()
                 metric_dict = {
                     'metric_origin': tensor_key.tags[-1],
                     'task_name': task_name,
                     'metric_name': tensor_key.tensor_name,
-                    'metric_value': metric_value,
+                    'metric_value': nparray,
                     'round': round_number}
                 if self.write_logs:
                     self.log_metric(tensor_key.tags[-1], task_name,
                                     tensor_key.tensor_name, nparray, round_number)
+
                 self.logger.metric(f'Round {round_number}, '
                                    f'collaborator {tensor_key.tags[-1]} '
                                    f'{task_name} result '
-                                   f'{tensor_key.tensor_name}:\t{metric_value:f}')
-                self.metric_queue.put(metric_dict)
+                                   f'{tensor_key.tensor_name}:\t{nparray}')
+                # TODO: this should be reintroduced
+                if self.nn:
+                    self.metric_queue.put(metric_dict)
 
             task_results.append(tensor_key)
             # By giving task_key it's own weight, we can support different
@@ -699,7 +711,7 @@ class Aggregator:
         """
         if self._is_task_done(task_name):
             # now check for the end of the round
-            self._end_of_round_check()
+            self._end_of_round_check(task_name)
 
     def _prepare_trained(self, tensor_name, origin, round_number, report, agg_results):
         """
@@ -723,7 +735,7 @@ class Aggregator:
         agg_tag_tk = TensorKey(
             tensor_name,
             origin,
-            round_number + 1,
+            round_number + 1 if self.nn else round_number,
             report,
             ('aggregated',)
         )
@@ -851,15 +863,11 @@ class Aggregator:
                 agg_tensor_key, collaborator_weight_dict, aggregation_function=agg_function)
             if report:
                 # Print the aggregated metric
-                if isinstance(agg_results, np.ndarray):
-                    agg_results = agg_results.tolist()
-                    if not isinstance(agg_results, list):
-                        agg_results = [agg_results]
                 metric_dict = {
                     'metric_origin': 'Aggregator',
                     'task_name': task_name,
                     'metric_name': tensor_key.tensor_name,
-                    'metric_value': agg_results.item(),
+                    'metric_value': agg_results.item() if self.nn else agg_results,
                     'round': round_number}
 
                 if agg_results is None:
@@ -868,15 +876,17 @@ class Aggregator:
                         f'for round {self.round_number}. Skipping reporting for this round')
                 if agg_function:
                     self.logger.metric(f'Round {round_number}, aggregator: {task_name} '
-                                       f'{agg_function} {agg_tensor_name}:\t{agg_results:f}')
+                                       f'{agg_function} {agg_tensor_name}:\t{agg_results}')
                 else:
                     self.logger.metric(f'Round {round_number}, aggregator: {task_name} '
-                                       f'{agg_tensor_name}:\t{agg_results:f}')
+                                       f'{agg_tensor_name}:\t{agg_results}')
                 if self.write_logs:
                     self.log_metric('Aggregator', task_name,
                                     tensor_key.tensor_name,
                                     agg_results, round_number)
-                self.metric_queue.put(metric_dict)
+                # TODO: this should be reintroduced
+                if self.nn:
+                    self.metric_queue.put(metric_dict)
                 # TODO: This is disabled for non DNN models since it is in conflict with the exchange of arrays of metrics
                 if self.nn:
                     # TODO Add all of the logic for saving the model based
@@ -909,20 +919,16 @@ class Aggregator:
         Returns:
             None
         """
-        if not self.nn:
-            if task_name is not None:
-                self._compute_validation_related_task_metrics(task_name)
-            else:
-                self.logger.info('No task name provided, no metric can be computed')
-
-        if not self._is_round_done() or self._end_of_round_check_done[self.round_number]:
-            return
-
-        # Compute all validation related metrics
         if self.nn:
+            if not self._is_round_done() or self._end_of_round_check_done[self.round_number]:
+                return
             all_tasks = self.assigner.get_all_tasks_for_round(self.round_number)
             for task_name in all_tasks:
                 self._compute_validation_related_task_metrics(task_name)
+        else:
+            self._compute_validation_related_task_metrics(task_name)
+            if not self._is_round_done():
+                return
 
         # Once all of the task results have been processed
         self._end_of_round_check_done[self.round_number] = True
@@ -947,21 +953,21 @@ class Aggregator:
         """Check that task is done."""
 
         if round_number is None:
-            round_number=self.round_number
+            round_number = self.round_number
 
         all_collaborators = self.assigner.get_collaborators_for_task(
             task_name, round_number
         )
-        
+
         collaborators_done = []
         for c in all_collaborators:
             if self._collaborator_task_completed(
-                c, task_name, round_number):
+                    c, task_name, round_number):
                 collaborators_done.append(c)
-        
+
         straggler_check = self.straggler_handling_policy.straggler_cutoff_check(
             len(collaborators_done), all_collaborators)
-        
+
         stragglers = []
         if straggler_check:
             for c in all_collaborators:

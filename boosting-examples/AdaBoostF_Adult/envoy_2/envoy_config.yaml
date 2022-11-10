@@ -21,9 +21,9 @@ params:
   cuda_devices: [ ]
 
 shard_descriptor:
-  template: unito.examples.AdaBoostF_Adult.workspace.adult_shard_descriptor.AdultShardDescriptor
+  template: adult_shard_descriptor.AdultShardDescriptor
   params:
     data_path: ../adult_data
     sample_shape: [ '14' ]
     target_shape: [ '1' ]
-    rank_worldsize: 2, 10
+    rank_worldsize: 2, 2

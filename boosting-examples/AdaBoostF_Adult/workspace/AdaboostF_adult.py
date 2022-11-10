@@ -1,12 +1,11 @@
 import numpy as np
-from openfl.interface.interactive_api.experiment import ModelInterface
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.tree import DecisionTreeClassifier
 
 from AdultDataset import AdultDataset
-from unito.examples.AdaBoostF_Adult.director.adaboost import AdaBoostF
-from unito.openfl_ext.experiment import FLExperiment, TaskInterface
-from unito.openfl_ext.federation import Federation
+from adaboost import AdaBoostF
+from openfl.interface.interactive_api.experiment import FLExperiment, TaskInterface, ModelInterface, DataInterface
+from openfl.interface.interactive_api.federation import Federation
 
 random_state = np.random.RandomState(31415)
 
@@ -73,22 +72,22 @@ def adaboost_update(model, val_loader, device):
 
 
 federation = Federation(client_id=client_id, director_node_fqdn=director_node_fqdn, director_port='50052', tls=False)
-fl_experiment = FLExperiment(federation=federation, experiment_name="AdaboostF_adult",
-                             serializer_plugin='openfl.plugins.interface_serializer.dill_serializer.DillSerializer')
+fl_experiment = FLExperiment(federation=federation, experiment_name="AdaboostF_Adult",
+                             serializer_plugin='openfl.plugins.interface_serializer.dill_serializer.DillSerializer',
+                             load_default_plan=False)
 model_interface = ModelInterface(
     model=AdaBoostF(base_estimator=DecisionTreeClassifier(max_leaf_nodes=10)),
     optimizer=None,
-    framework_plugin='unito.openfl_ext.generic_adapter.GenericAdapter')
+    framework_plugin='openfl.plugins.frameworks_adapters.generic_adapter.GenericAdapter')
 federated_dataset = AdultDataset()
 
 fl_experiment.start(
     model_provider=model_interface,
     task_keeper=task_interface,
     data_loader=federated_dataset,
-    rounds_to_train=300,
+    rounds_to_train=3,
     opt_treatment='CONTINUE_GLOBAL',
     nn=False,
-    default=False
 )
 
 fl_experiment.stream_metrics(tensorboard_logs=False)

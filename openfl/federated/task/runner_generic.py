@@ -3,6 +3,7 @@
 from logging import getLogger
 
 import numpy as np
+
 from openfl.federated.task.task_runner import CoreTaskRunner
 from openfl.utilities import TensorKey
 from openfl.utilities import split_tensor_dict_for_holdouts
@@ -178,7 +179,7 @@ class GenericTaskRunner(CoreTaskRunner):
             # on random data to get the optimizer names,
             # and then throwing away the model.
             if self.opt_treatment == 'CONTINUE_GLOBAL':
-                self.initialize_tensorkeys_for_functions(with_opt_vars=True if self.nn else False)
+                self.initialize_tensorkeys_for_functions()
 
             # This will signal that the optimizer values are now present,
             # and can be loaded when the model is rebuilt
@@ -251,7 +252,7 @@ class GenericTaskRunner(CoreTaskRunner):
             aggregate_optimizer_parameters = False
         self.initialize_tensorkeys_for_functions(with_opt_vars=aggregate_optimizer_parameters)
 
-    def initialize_tensorkeys_for_functions(self, with_opt_vars=False, nn=False):
+    def initialize_tensorkeys_for_functions(self, with_opt_vars=False):
         """Set the required tensors for all publicly accessible task methods.
 
         By default, this is just all of the layers and optimizer of the model.
@@ -271,7 +272,7 @@ class GenericTaskRunner(CoreTaskRunner):
             self.logger,
             output_model_dict,
             **self.tensor_dict_split_fn_kwargs
-        ) if nn else output_model_dict, output_model_dict
+        ) if self.nn else output_model_dict, output_model_dict
         # Now set model dict for training tasks
         if with_opt_vars:
             output_model_dict = self.get_tensor_dict(with_opt_vars=True)
@@ -288,7 +289,7 @@ class GenericTaskRunner(CoreTaskRunner):
         self.required_tensorkeys_for_function['global_model_dict_val'] = global_model_dict_val
         self.required_tensorkeys_for_function['local_model_dict_val'] = local_model_dict_val
 
-    def get_required_tensorkeys_for_function(self, func_name, nn=False, **kwargs):
+    def get_required_tensorkeys_for_function(self, func_name, **kwargs):
         """
         Get the required tensors for specified function that could be called as part of a task.
 

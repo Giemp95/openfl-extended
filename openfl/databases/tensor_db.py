@@ -33,6 +33,7 @@ class TensorDB:
         self.tensor_db = pd.DataFrame([], columns=[
             'tensor_name', 'origin', 'round', 'report', 'tags', 'nparray'
         ])
+        self.tensor_db = self.tensor_db.astype({"report": bool})
         self._bind_convenience_methods()
         self.nn = nn
         self.mutex = Lock()

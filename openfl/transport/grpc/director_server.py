@@ -141,7 +141,8 @@ class DirectorGRPCServer(director_pb2_grpc.DirectorServicer):
 
         tensor_dict = None
         if request.model_proto:
-            tensor_dict, _ = deconstruct_model_proto(request.model_proto, GenericPipeline())
+            # TODO: the pipeline class should not be fixed
+            tensor_dict, _ = deconstruct_model_proto(request.model_proto, GenericPipeline(nn=False))
 
         caller = self.get_caller(context)
 

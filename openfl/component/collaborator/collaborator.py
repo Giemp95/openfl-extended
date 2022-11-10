@@ -2,14 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Collaborator module."""
-
 from enum import Enum
 from logging import getLogger
 from time import sleep
 from typing import Tuple
 
+import numpy as np
+
 from openfl.databases import TensorDB
-from openfl.pipelines import NoCompressionPipeline
+from openfl.pipelines import NoCompressionPipeline, GenericPipeline
 from openfl.pipelines import TensorCodec
 from openfl.protocols import utils
 from openfl.utilities import TensorKey
@@ -79,7 +80,7 @@ class Collaborator:
                  delta_updates=False,
                  compression_pipeline=None,
                  db_store_rounds=1,
-                 nn=False,
+                 nn=True,
                  **kwargs):
         """Initialize."""
         self.single_col_cert_common_name = None
@@ -94,9 +95,13 @@ class Collaborator:
         self.aggregator_uuid = aggregator_uuid
         self.federation_uuid = federation_uuid
 
-        self.compression_pipeline = compression_pipeline or NoCompressionPipeline()
+        if self.nn:
+            self.compression_pipeline = compression_pipeline or NoCompressionPipeline()
+        else:
+            self.compression_pipeline = GenericPipeline(self.nn)
+
         self.tensor_codec = TensorCodec(self.compression_pipeline)
-        self.tensor_db = TensorDB()
+        self.tensor_db = TensorDB(self.nn)
         self.db_store_rounds = db_store_rounds
 
         self.task_runner = task_runner
@@ -193,7 +198,7 @@ class Collaborator:
     def do_task(self, task, round_number):
         """Do the specified task."""
         # map this task to an actual function name and kwargs
-        if hasattr(self.task_runner, 'TASK_REGISTRY'):
+        if hasattr(self.task_runner, 'TASK_REGISTRY') and self.nn:
             func_name = task.function_name
             task_name = task.name
             kwargs = {}
@@ -238,7 +243,6 @@ class Collaborator:
         input_tensor_dict = self.get_numpy_dict_for_tensorkeys(
             required_tensorkeys
         )
-
         # now we have whatever the model needs to do the task
         if hasattr(self.task_runner, 'TASK_REGISTRY'):
             # New interactive python API
@@ -264,10 +268,10 @@ class Collaborator:
 
         # TODO: this should be generalized
         if not self.nn:
-            if task == '1_train' or task == '2_weak_learners_validate':
+            if task_name == '1_train' or task_name == '2_weak_learners_validate':
                 kwargs['adaboost_coeff'] = self.adaboost_coeff
 
-        global_output_tensor_dict, local_output_tensor_dict = func(
+        global_output_tensor_dict, local_output_tensor_dict, optional = func(
             col_name=self.collaborator_name,
             round_num=round_number,
             input_tensor_dict=input_tensor_dict,
@@ -275,10 +279,10 @@ class Collaborator:
 
         # TODO: this should be generalized
         if not self.nn:
-            if task == '2_weak_learners_validate':
+            if task_name == '2_weak_learners_validate':
                 self.model_buffer = input_tensor_dict['generic_model']
                 self.errors = optional
-            elif task == '3_adaboost_update':
+            elif task_name == '3_adaboost_update':
                 # With this we are
                 input_tensor_dict = input_tensor_dict['generic_model']
                 alpha = input_tensor_dict[0]
@@ -318,7 +322,7 @@ class Collaborator:
         # Synchronisation point for AdaBoost.F
         # TODO: this should be applied only if the next task is GLOBAL
         if not self.nn:
-            while not self.synch(task, round_number, self.collaborator_name):
+            while not self.synch(task_name, round_number, self.collaborator_name):
                 sleep(0.5)
 
     def synch(self, task_name, round_number, collaborator_name):
@@ -341,52 +345,56 @@ class Collaborator:
         # try to get from the store
         tensor_name, origin, round_number, report, tags = tensor_key
 
-        if self.nn:
+        self.logger.debug(f'Attempting to retrieve tensor {tensor_key} from local store')
+        # nparray = self.tensor_db.get_tensor_from_cache(tensor_key)
+
+        nparray = None
+        if 'model' in tags:
+            # Pulling the model for the first time
+            nparray = self.get_tensor_from_aggregator(
+                tensor_key,
+                require_lossless=True,
+                aggregated=True
+            )
+        # These tags are specific to AdaBoost.F
+        elif 'weak_learner' in tags:
+            nparray = self.get_tensor_from_aggregator(
+                tensor_key,
+                require_lossless=True,
+                aggregated=False,
+            )
+        elif 'adaboost_coeff' in tags:
+            nparray = self.get_tensor_from_aggregator(
+                tensor_key,
+                require_lossless=True,
+                aggregated=False,
+            )
+
+        if origin == self.collaborator_name:
             self.logger.debug(f'Attempting to retrieve tensor {tensor_key} from local store')
             nparray = self.tensor_db.get_tensor_from_cache(tensor_key)
-        else:
-            nparray = None
-            if 'model' in tags:
-                # Pulling the model for the first time
-                # TODO: maybe this is not useful anymore
-                nparray = self.get_aggregated_tensor_from_aggregator(
-                    tensor_key,
-                    require_lossless=True
-                )
-            # These tags are specific to AdaBoost.F
-            elif 'weak_learner' in tags:
-                nparray = self.get_tensor_from_aggregator(
-                    tensor_key,
-                    require_lossless=True,
-                    aggregate=False
-                )
-            elif 'adaboost_coeff' in tags:
-                nparray = self.get_tensor_from_aggregator(
-                    tensor_key,
-                    require_lossless=True,
-                    aggregate=False
-                )
 
-        # if None and origin is our client, request it from the client
-        if nparray is None:
-            if origin == self.collaborator_name:
-                self.logger.info(
-                    f'Attempting to find locally stored {tensor_name} tensor from prior round...'
-                )
-                prior_round = round_number - 1
-                while prior_round >= 0:
-                    nparray = self.tensor_db.get_tensor_from_cache(
-                        TensorKey(tensor_name, origin, prior_round, report, tags))
-                    if nparray is not None:
-                        self.logger.debug(f'Found tensor {tensor_name} in local TensorDB '
-                                          f'for round {prior_round}')
-                        return nparray
-                    prior_round -= 1
-                self.logger.info(
-                    f'Cannot find any prior version of tensor {tensor_name} locally...'
-                )
-            self.logger.debug('Unable to get tensor from local store...'
-                              'attempting to retrieve from client')
+            # if None and origin is our client, request it from the client
+            if nparray is None:
+                if origin == self.collaborator_name:
+                    self.logger.info(
+                        f'Attempting to find locally stored {tensor_name} tensor from prior round...'
+                    )
+                    prior_round = round_number - 1
+                    while prior_round >= 0:
+                        nparray = self.tensor_db.get_tensor_from_cache(
+                            TensorKey(tensor_name, origin, prior_round, report, tags))
+                        if nparray is not None:
+                            self.logger.debug(f'Found tensor {tensor_name} in local TensorDB '
+                                              f'for round {prior_round}')
+                            return nparray
+                        prior_round -= 1
+                    self.logger.info(
+                        f'Cannot find any prior version of tensor {tensor_name} locally...'
+                    )
+                    self.logger.debug('Unable to get tensor from local store...'
+                                      'attempting to retrieve from client')
+        else:
             # Determine whether there are additional compression related
             # dependencies.
             # Typically, dependencies are only relevant to model layers
@@ -403,8 +411,9 @@ class Collaborator:
                     tensor_dependencies[0]
                 )
                 if prior_model_layer is not None:
-                    uncompressed_delta = self.get_aggregated_tensor_from_aggregator(
-                        tensor_dependencies[1]
+                    uncompressed_delta = self.get_tensor_from_aggregator(
+                        tensor_dependencies[1],
+                        aggregated=True
                     )
                     new_model_tk, nparray = self.tensor_codec.apply_delta(
                         tensor_dependencies[1],
@@ -417,23 +426,16 @@ class Collaborator:
                     self.logger.info('Count not find previous model layer.'
                                      'Fetching latest layer from aggregator')
                     # The original model tensor should be fetched from client
-                    nparray = self.get_aggregated_tensor_from_aggregator(
+                    nparray = self.get_tensor_from_aggregator(
                         tensor_key,
-                        require_lossless=True
+                        require_lossless=True,
+                        aggregated=True
                     )
-            elif 'model' in tags:
-                # Pulling the model for the first time
-                nparray = self.get_aggregated_tensor_from_aggregator(
-                    tensor_key,
-                    require_lossless=True
-                )
-        else:
-            self.logger.debug(f'Found tensor {tensor_key} in local TensorDB')
 
         return nparray
 
     def get_tensor_from_aggregator(self, tensor_key,
-                                              require_lossless=False, aggregate=True):
+                                   require_lossless=False, aggregated=True):
         """
         Return the decompressed tensor associated with the requested tensor key.
 
@@ -461,7 +463,7 @@ class Collaborator:
 
         self.logger.debug(f'Requesting tensor {tensor_key}')
         tensor = self.client.get_tensor(
-            self.collaborator_name, tensor_name, round_number, report, tags, require_lossless, aggregate)
+            self.collaborator_name, tensor_name, round_number, report, tags, require_lossless, aggregated)
 
         # this translates to a numpy array and includes decompression, as
         # necessary
@@ -498,7 +500,7 @@ class Collaborator:
                 self.logger.metric(
                     f'Round {round_number}, collaborator {self.collaborator_name} '
                     f'is sending metric for task {task_name}:'
-                    f' {tensor_name}\t{tensor_dict[tensor]:f}')
+                    f' {tensor_name}\t{tensor_dict[tensor]}')
 
         self.client.send_local_task_results(
             self.collaborator_name, round_number, task_name, data_size, named_tensors)

@@ -183,12 +183,13 @@ class AggregatorGRPCServer(aggregator_pb2_grpc.AggregatorServicer):
         require_lossless = request.require_lossless
         round_number = request.round_number
         report = request.report
+        aggregated = request.aggregated
         tags = tuple(request.tags)
 
         named_tensor = self.aggregator.get_tensor(
-            collaborator_name, tensor_name, round_number, report, tags, require_lossless)
+            collaborator_name, tensor_name, round_number, report, tags, require_lossless, aggregated)
 
-        return aggregator_pb2.GetAggregatedTensorResponse(
+        return aggregator_pb2.GetTensorResponse(
             header=self.get_header(collaborator_name),
             round_number=round_number,
             tensor=named_tensor
@@ -208,7 +209,7 @@ class AggregatorGRPCServer(aggregator_pb2_grpc.AggregatorServicer):
         round_number = request.round_number
         is_completed = self.aggregator.synch(task_name, round_number)
 
-        return SynchResponse(
+        return aggregator_pb2.SynchResponse(
             header=self.get_header(collaborator_name),
             is_completed=is_completed
         )

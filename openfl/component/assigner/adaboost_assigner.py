@@ -1,10 +1,10 @@
 from importlib import import_module
 from os.path import splitext
 
-from openfl.component import RandomGroupedAssigner
+from .random_grouped_assigner import RandomGroupedAssigner
 
 
-class Assigner(RandomGroupedAssigner):
+class AdaBoostAssigner(RandomGroupedAssigner):
 
     def __init__(self, task_groups, **kwargs):
         super().__init__(task_groups, **kwargs)

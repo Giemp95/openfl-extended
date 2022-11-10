@@ -43,7 +43,8 @@ class FLExperiment:
             federation,
             experiment_name: str = None,
             serializer_plugin: str = 'openfl.plugins.interface_serializer.'
-                                     'cloudpickle_serializer.CloudpickleSerializer'
+                                     'cloudpickle_serializer.CloudpickleSerializer',
+            load_default_plan=True
     ) -> None:
         """
         Initialize an experiment inside a federation.
@@ -55,6 +56,7 @@ class FLExperiment:
         self.experiment_name = experiment_name or 'test-' + time.strftime('%Y%m%d-%H%M%S')
         self.summary_writer = None
         self.serializer_plugin = serializer_plugin
+        self.load_default_plan = load_default_plan
 
         self.experiment_accepted = False
 
@@ -72,8 +74,12 @@ class FLExperiment:
         os.makedirs('./plan', exist_ok=True)
         os.makedirs('./save', exist_ok=True)
         # Load the default plan
-        base_plan_path = WORKSPACE / 'workspace/plan/plans/default/base_plan_interactive_api.yaml'
-        plan = Plan.parse(base_plan_path, resolve=False)
+        if self.load_default_plan:
+            base_plan_path = WORKSPACE / 'workspace/plan/plans/default/base_plan_interactive_api.yaml'
+            plan = Plan.parse(base_plan_path, resolve=False)
+        else:
+            # TODO: make the path configuratble by the user
+            plan = Plan.parse(Path("./plan/plan.yaml"), resolve=False)
         # Change plan name to default one
         plan.name = 'plan.yaml'
 
@@ -238,7 +244,8 @@ class FLExperiment:
                 name=self.experiment_name,
                 col_names=self.plan.authorized_cols,
                 arch_path=self.arch_path,
-                initial_tensor_dict=initial_tensor_dict
+                initial_tensor_dict=initial_tensor_dict,
+                nn=nn
             )
         finally:
             self.remove_workspace_archive()
@@ -333,11 +340,15 @@ class FLExperiment:
         """Extract initial weights from the model."""
         self.task_runner_stub = self.plan.get_core_task_runner(model_provider=model_provider, nn=nn)
         self.current_model_status = ModelStatus.INITIAL
-        tensor_dict, _ = split_tensor_dict_for_holdouts(
-            self.logger,
-            self.task_runner_stub.get_tensor_dict(False),
-            **self.task_runner_stub.tensor_dict_split_fn_kwargs
-        )
+        if nn:
+            tensor_dict, _ = split_tensor_dict_for_holdouts(
+                self.logger,
+                self.task_runner_stub.get_tensor_dict(False),
+                **self.task_runner_stub.tensor_dict_split_fn_kwargs
+            )
+        else:
+            tensor_dict = self.task_runner_stub.get_tensor_dict()
+
         return tensor_dict
 
     def _prepare_plan(self, model_provider, data_loader,
