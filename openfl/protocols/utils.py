@@ -6,7 +6,7 @@ from openfl.protocols import base_pb2
 from openfl.utilities import TensorKey
 
 
-def model_proto_to_bytes_and_metadata(model_proto):
+def model_proto_to_bytes_and_metadata(model_proto, nn):
     """Convert the model protobuf to bytes and metadata.
 
     Args:
@@ -24,7 +24,8 @@ def model_proto_to_bytes_and_metadata(model_proto):
         metadata_dict[tensor_proto.name] = [{
             'int_to_float': proto.int_to_float,
             'int_list': proto.int_list,
-            'bool_list': proto.bool_list
+            'bool_list': proto.bool_list,
+            'model': not nn
         }
             for proto in tensor_proto.transformer_metadata
         ]
@@ -91,10 +92,16 @@ def construct_named_tensor(tensor_key, nparray, transformer_metadata, lossless):
             bool_list = metadata.get('bool_list')
         else:
             bool_list = []
+
+        if metadata.get('model') is not None:
+            model = metadata.get('model')
+        else:
+            model = False
         metadata_protos.append(base_pb2.MetadataProto(
             int_to_float=int_to_float,
             int_list=int_list,
             bool_list=bool_list,
+            model=model
         ))
 
     tensor_name, origin, round_number, report, tags = tensor_key
@@ -134,7 +141,7 @@ def construct_model_proto(tensor_dict, round_number, tensor_pipe):
     # TODO: Hold-out tensors from the tensor compression pipeline.
     named_tensors = []
     for key, nparray in tensor_dict.items():
-        bytes_data, transformer_metadata = tensor_pipe.forward(data=nparray)
+        bytes_data, transformer_metadata = tensor_pipe.forward(data=nparray, key=key)
         tensor_key = TensorKey(key, 'agg', round_number, False, ('model',))
         named_tensors.append(construct_named_tensor(
             tensor_key,
@@ -149,7 +156,7 @@ def construct_model_proto(tensor_dict, round_number, tensor_pipe):
 def deconstruct_model_proto(model_proto, compression_pipeline):
     """Deconstruct model proto."""
     # extract the tensor_dict and metadata
-    bytes_dict, metadata_dict, round_number = model_proto_to_bytes_and_metadata(model_proto)
+    bytes_dict, metadata_dict, round_number = model_proto_to_bytes_and_metadata(model_proto, compression_pipeline.is_nn())
 
     # decompress the tensors
     # TODO: Handle tensors meant to be held-out from the compression pipeline
@@ -172,7 +179,7 @@ def deconstruct_proto(model_proto, compression_pipeline):
         protobuf: A protobuf of the model
     """
     # extract the tensor_dict and metadata
-    bytes_dict, metadata_dict = model_proto_to_bytes_and_metadata(model_proto)
+    bytes_dict, metadata_dict = model_proto_to_bytes_and_metadata(model_proto, compression_pipeline.is_nn())
 
     # decompress the tensors
     # TODO: Handle tensors meant to be held-out from the compression pipeline

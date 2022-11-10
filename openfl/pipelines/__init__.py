@@ -8,6 +8,7 @@ import pkgutil
 if pkgutil.find_loader('torch'):
     from .eden_pipeline import EdenPipeline  # NOQA
 
+from .generic_pipeline import GenericPipeline
 from .kc_pipeline import KCPipeline
 from .no_compression_pipeline import NoCompressionPipeline
 from .random_shift_pipeline import RandomShiftPipeline
@@ -22,5 +23,6 @@ __all__ = [
     'SKCPipeline',
     'KCPipeline',
     'EdenPipeline',
+    'GenericPipeline',
     'TensorCodec',
 ]
