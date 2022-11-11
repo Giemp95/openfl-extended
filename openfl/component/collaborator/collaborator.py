@@ -283,13 +283,12 @@ class Collaborator:
                 self.model_buffer = input_tensor_dict['generic_model']
                 self.errors = optional
             elif task_name == '3_adaboost_update':
-                # With this we are
                 input_tensor_dict = input_tensor_dict['generic_model']
                 alpha = input_tensor_dict[0]
                 best_model = int(input_tensor_dict[1])
 
-                self.adaboost_coeff = np.array([self.adaboost_coeff[i] * np.exp(alpha * self.errors[best_model][i])
-                                                for i in range(self.task_runner.get_train_data_size())])
+                self.adaboost_coeff *= np.exp(alpha * self.errors[best_model])
+
                 adaboost = self.tensor_db.get_tensor_from_cache(TensorKey(
                     'generic_model',
                     self.collaborator_name,
@@ -297,11 +296,13 @@ class Collaborator:
                     False,
                     ('adaboost',)
                 ))
-
-                if adaboost is not None:
-                    adaboost.add(self.model_buffer.get(best_model), alpha)
-                else:
+                print({self.tensor_db})
+                if adaboost is None:
+                    print("CREO IL MODELLO")
                     adaboost = self.model_buffer.replace(self.model_buffer.get(best_model), alpha)
+                else:
+                    print("AGGIORNO IL MODELLO")
+                    adaboost.add(self.model_buffer.get(best_model), alpha)
 
                 self.tensor_db.cache_tensor({TensorKey(
                     'generic_model',

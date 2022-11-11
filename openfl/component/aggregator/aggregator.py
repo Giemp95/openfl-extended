@@ -6,8 +6,6 @@ import queue
 import time
 from logging import getLogger
 
-import numpy as np
-
 from openfl.component.straggler_handling_functions import CutoffTimeBasedStragglerHandling
 from openfl.databases import TensorDB
 from openfl.interface.aggregation_functions import WeightedAverage
@@ -858,7 +856,13 @@ class Aggregator:
             agg_tensor_key = TensorKey(tensor_name, origin, round_number, report, new_tags)
             agg_tensor_name, agg_origin, agg_round_number, agg_report, agg_tags = agg_tensor_key
             # TODO: This if can be removed (maybe) (with a well-configurated plan)
-            agg_function = task_agg_function if task_name == '2_weak_learners_validate' else WeightedAverage() if 'metric' in tags else task_agg_function
+            if 'metric' in tags:
+                if task_name == "2_weak_learners_validate":
+                    agg_function = task_agg_function
+                else:
+                    agg_function = WeightedAverage()
+            else:
+                agg_function = task_agg_function
             agg_results = self.tensor_db.get_aggregated_tensor(
                 agg_tensor_key, collaborator_weight_dict, aggregation_function=agg_function)
             if report:
