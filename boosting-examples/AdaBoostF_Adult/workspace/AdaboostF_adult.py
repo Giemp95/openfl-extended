@@ -60,7 +60,6 @@ def adaboost_update(model, val_loader, device):
 @task_interface.register_fl_task(model='model', data_loader='val_loader', device='device')
 def validate(model, val_loader, device):
     X, y = val_loader
-    print(model.get_estimator_number())
     pred = model.predict(np.array(X))
     f1 = f1_score(y, pred, average="macro")
 
@@ -81,7 +80,7 @@ fl_experiment.start(
     model_provider=model_interface,
     task_keeper=task_interface,
     data_loader=federated_dataset,
-    rounds_to_train=30,
+    rounds_to_train=300,
     opt_treatment='CONTINUE_GLOBAL',
     nn=False,
 )

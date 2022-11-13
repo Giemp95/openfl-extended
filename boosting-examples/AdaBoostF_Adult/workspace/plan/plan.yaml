@@ -2,11 +2,11 @@ aggregator:
   settings:
     assigner: openfl.component.assigner.AdaBoostAssigner
     best_state_path: save/best.pbuf
-    db_store_rounds: 301
+    db_store_rounds: 1
     init_state_path: save/init.pbuf
     last_state_path: save/last.pbuf
     nn: false
-    rounds_to_train: 30
+    rounds_to_train: 300
     write_logs: false
   template: openfl.component.aggregator.Aggregator
 api_layer:
@@ -31,7 +31,7 @@ assigner:
   template: openfl.component.assigner.AdaBoostAssigner
 collaborator:
   settings:
-    db_store_rounds: 301
+    db_store_rounds: 2
     delta_updates: false
     device_assignment_policy: CPU_ONLY
     nn: false

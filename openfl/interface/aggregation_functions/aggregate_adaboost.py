@@ -1,4 +1,5 @@
 import numpy as np
+
 from openfl.interface.aggregation_functions import AggregationFunction
 
 
@@ -13,9 +14,7 @@ class AggregateAdaboost(AggregationFunction):
         tensors = [x.tensor for x in local_tensors]
 
         errors = np.array([tensor[:-1] for tensor in tensors])
-        print([tensor[:-1] for tensor in tensors])
         norm = sum([tensor[-1] for tensor in tensors])
-        print([tensor[-1] for tensor in tensors])
         wl_errs = errors.sum(axis=0) / norm
 
         best_model = wl_errs.argmin()

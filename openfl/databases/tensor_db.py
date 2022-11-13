@@ -4,19 +4,19 @@
 """TensorDB Module."""
 
 from threading import Lock
+from types import MethodType
 from typing import Dict
 from typing import Iterator
 from typing import Optional
-from types import MethodType
 
 import numpy as np
 import pandas as pd
 
+from openfl.databases.utilities import _search, _store, _retrieve, ROUND_PLACEHOLDER
 from openfl.interface.aggregation_functions import AggregationFunction
-from openfl.utilities import change_tags
 from openfl.utilities import LocalTensor
 from openfl.utilities import TensorKey
-from openfl.databases.utilities import _search,_store,_retrieve, ROUND_PLACEHOLDER
+from openfl.utilities import change_tags
 
 
 class TensorDB:
@@ -56,7 +56,6 @@ class TensorDB:
     def __str__(self) -> str:
         """Printable string representation."""
         return self.__repr__()
-        
 
     def clean_up(self, remove_older_than: int = 1) -> None:
         """Remove old entries from database preventing the db from becoming too large and slow."""
@@ -66,10 +65,17 @@ class TensorDB:
         current_round = self.tensor_db['round'].astype(int).max()
         if current_round == ROUND_PLACEHOLDER:
             current_round = np.sort(self.tensor_db['round'].astype(int).unique())[-2]
-        self.tensor_db = self.tensor_db[
-            (self.tensor_db['round'].astype(int) > current_round - remove_older_than) |
-            (self.tensor_db['report'] == True)
-        ].reset_index(drop=True)
+        if self.nn:
+            self.tensor_db = self.tensor_db[
+                (self.tensor_db['round'].astype(int) > current_round - remove_older_than) |
+                (self.tensor_db['report'] == True)
+                ].reset_index(drop=True)
+        else:
+            self.tensor_db = self.tensor_db[
+                (self.tensor_db['round'].astype(int) > current_round - remove_older_than) |
+                (self.tensor_db['report'] == True) |
+                (self.tensor_db['tags'] == ('weak_learner',))
+                ].reset_index(drop=True)
 
     def cache_tensor(self, tensor_key_dict: Dict[TensorKey, np.ndarray]) -> None:
         """Insert tensor into TensorDB (dataframe).
@@ -190,11 +196,11 @@ class TensorDB:
                          for col_name in collaborator_names]
 
         if hasattr(aggregation_function, '_privileged'):
-            if(aggregation_function._privileged):
+            if (aggregation_function._privileged):
                 with self.mutex:
-                    #self.tensor_db.store = MethodType(_store, self.tensor_db)
-                    #self.tensor_db.retrieve = MethodType(_retrieve, self.tensor_db)
-                    #self.tensor_db.search = MethodType(_search, self.tensor_db)
+                    # self.tensor_db.store = MethodType(_store, self.tensor_db)
+                    # self.tensor_db.retrieve = MethodType(_retrieve, self.tensor_db)
+                    # self.tensor_db.search = MethodType(_search, self.tensor_db)
                     self._bind_convenience_methods()
                     agg_nparray = aggregation_function(local_tensors,
                                                        self.tensor_db,

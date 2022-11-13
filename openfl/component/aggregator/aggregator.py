@@ -855,7 +855,7 @@ class Aggregator:
             new_tags = change_tags(tags, remove_field=collaborators_for_task[0])
             agg_tensor_key = TensorKey(tensor_name, origin, round_number, report, new_tags)
             agg_tensor_name, agg_origin, agg_round_number, agg_report, agg_tags = agg_tensor_key
-            # TODO: This if can be removed (maybe) (with a well-configurated plan)
+            # TODO: This if can be removed (maybe with a well-configurated plan)
             if 'metric' in tags:
                 if task_name == "2_weak_learners_validate":
                     agg_function = task_agg_function

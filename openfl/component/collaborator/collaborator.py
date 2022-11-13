@@ -296,12 +296,9 @@ class Collaborator:
                     False,
                     ('adaboost',)
                 ))
-                print({self.tensor_db})
                 if adaboost is None:
-                    print("CREO IL MODELLO")
                     adaboost = self.model_buffer.replace(self.model_buffer.get(best_model), alpha)
                 else:
-                    print("AGGIORNO IL MODELLO")
                     adaboost.add(self.model_buffer.get(best_model), alpha)
 
                 self.tensor_db.cache_tensor({TensorKey(
