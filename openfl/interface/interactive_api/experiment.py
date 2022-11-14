@@ -13,12 +13,12 @@ from typing import Tuple
 
 from tensorboardX import SummaryWriter
 
-from openfl.interface.aggregation_functions import AggregationFunction
-from openfl.interface.aggregation_functions import WeightedAverage
 from openfl.component.assigner.tasks import Task
 from openfl.component.assigner.tasks import TrainTask
 from openfl.component.assigner.tasks import ValidateTask
 from openfl.federated import Plan
+from openfl.interface.aggregation_functions import AggregationFunction
+from openfl.interface.aggregation_functions import WeightedAverage
 from openfl.interface.cli import setup_logging
 from openfl.interface.cli_helper import WORKSPACE
 from openfl.native import update_plan
@@ -44,7 +44,8 @@ class FLExperiment:
             experiment_name: str = None,
             serializer_plugin: str = 'openfl.plugins.interface_serializer.'
                                      'cloudpickle_serializer.CloudpickleSerializer',
-            load_default_plan=True
+            load_default_plan=True,
+            nn=True
     ) -> None:
         """
         Initialize an experiment inside a federation.
@@ -62,11 +63,12 @@ class FLExperiment:
 
         self.is_validate_task_exist = False
 
+        self.nn = True
+
         self.logger = getLogger(__name__)
         setup_logging()
 
         self._initialize_plan()
-
 
     def _initialize_plan(self):
         """Setup plan from base plan interactive api."""
@@ -84,7 +86,7 @@ class FLExperiment:
         plan.name = 'plan.yaml'
 
         self.plan = deepcopy(plan)
-    
+
     def _assert_experiment_accepted(self):
         """Assure experiment is sent to director."""
         if not self.experiment_accepted:
@@ -191,8 +193,7 @@ class FLExperiment:
               delta_updates: bool = False,
               opt_treatment: str = 'RESET',
               device_assignment_policy: str = 'CPU_ONLY',
-              nn=True,
-              pip_install_options: Tuple[str] = ()) -> None:
+            pip_install_options: Tuple[str] = ()) -> None:
         """
         Prepare workspace distribution and send to Director.
 
@@ -238,14 +239,14 @@ class FLExperiment:
 
         self.logger.info('Starting experiment!')
         self.plan.resolve()
-        initial_tensor_dict = self._get_initial_tensor_dict(model_provider, nn)
+        initial_tensor_dict = self._get_initial_tensor_dict(model_provider, self.nn)
         try:
             response = self.federation.dir_client.set_new_experiment(
                 name=self.experiment_name,
                 col_names=self.plan.authorized_cols,
                 arch_path=self.arch_path,
                 initial_tensor_dict=initial_tensor_dict,
-                nn=nn
+                nn=self.nn
             )
         finally:
             self.remove_workspace_archive()
@@ -281,6 +282,7 @@ class FLExperiment:
                         tasks['aggregated_model_validate'],
                     ]
                 return tasks_by_collaborator
+
             return assigner
         elif not is_train_task_exist and self.is_validate_task_exist:
             def assigner(collaborators, round_number, **kwargs):
@@ -290,6 +292,7 @@ class FLExperiment:
                         tasks['aggregated_model_validate'],
                     ]
                 return tasks_by_collaborator
+
             return assigner
         elif is_train_task_exist and not self.is_validate_task_exist:
             raise Exception('You should define validate task!')
@@ -409,7 +412,7 @@ class FLExperiment:
                 'tasks_interface_file': tasks_interface_file,
                 'dataloader_interface_file': dataloader_interface_file,
                 'aggregation_function_interface_file': aggregation_function_interface_file,
-                'task_assigner_file': task_assigner_file
+                'task_assigner_file': task_assigner_file if self.nn else None
             }
         }
 
@@ -468,7 +471,7 @@ class TaskKeeper:
         # Mapping 'task_alias' -> Task
         self._tasks: Dict[str, Task] = {}
 
-    # TODO: maybe in case of AdaBoost.F the adaboost_coeff could be storend in the optimizer parameter
+    # TODO: maybe in case of AdaBoost.F the adaboost_coeff could be stored in the optimizer parameter
     def register_fl_task(self, model, data_loader, device, optimizer=None, round_num=None, adaboost_coeff=None):
         """
         Register FL tasks.
@@ -494,6 +497,7 @@ class TaskKeeper:
             return {'metric_name': metric, 'metric_name_2': metric_2,}
         `
         """
+
         # The highest level wrapper for allowing arguments for the decorator
         def decorator_with_args(training_method):
             # We could pass hooks to the decorator
@@ -545,6 +549,7 @@ class TaskKeeper:
         This one is a decorator because we need task name and
         to be consistent with the main registering method
         """
+
         # The highest level wrapper for allowing arguments for the decorator
         def decorator_with_args(training_method):
             # Saving the task's settings to be written in plan
@@ -574,12 +579,14 @@ class TaskKeeper:
         .. _Overriding the aggregation function:
             https://openfl.readthedocs.io/en/latest/overriding_agg_fn.html
         """
+
         def decorator_with_args(training_method):
             if not isinstance(aggregation_function, AggregationFunction):
                 raise Exception('aggregation_function must implement '
                                 'AggregationFunction interface.')
             self.aggregation_functions[training_method.__name__] = aggregation_function
             return training_method
+
         return decorator_with_args
 
     def get_registered_tasks(self) -> Dict[str, Task]:

@@ -244,7 +244,7 @@ class Collaborator:
             required_tensorkeys
         )
         # now we have whatever the model needs to do the task
-        if hasattr(self.task_runner, 'TASK_REGISTRY'):
+        if hasattr(self.task_runner, 'TASK_REGISTRY') and self.nn:
             # New interactive python API
             # New `Core` TaskRunner contains registry of tasks
             func = self.task_runner.TASK_REGISTRY[func_name]

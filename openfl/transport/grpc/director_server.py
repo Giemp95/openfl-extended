@@ -15,14 +15,13 @@ from google.protobuf.json_format import ParseDict
 from grpc import aio
 from grpc import ssl_server_credentials
 
-from openfl.pipelines import NoCompressionPipeline, GenericPipeline
+from openfl.pipelines import GenericPipeline
 from openfl.protocols import base_pb2
 from openfl.protocols import director_pb2
 from openfl.protocols import director_pb2_grpc
 from openfl.protocols.utils import construct_model_proto
 from openfl.protocols.utils import deconstruct_model_proto
 from openfl.protocols.utils import get_headers
-
 from .grpc_channel_options import channel_options
 
 logger = logging.getLogger(__name__)
@@ -42,6 +41,7 @@ class DirectorGRPCServer(director_pb2_grpc.DirectorServicer):
             certificate: Optional[Union[Path, str]] = None,
             listen_host: str = '[::]',
             listen_port: int = 50051,
+            nn=True,
             **kwargs,
     ) -> None:
         """Initialize a director object."""
@@ -63,6 +63,7 @@ class DirectorGRPCServer(director_pb2_grpc.DirectorServicer):
             certificate=self.certificate,
             **kwargs
         )
+        self.nn = nn
 
     def _fill_certs(self, root_certificate, private_key, certificate):
         """Fill certificates."""
@@ -142,7 +143,7 @@ class DirectorGRPCServer(director_pb2_grpc.DirectorServicer):
         tensor_dict = None
         if request.model_proto:
             # TODO: the pipeline class should not be fixed
-            tensor_dict, _ = deconstruct_model_proto(request.model_proto, GenericPipeline(nn=False))
+            tensor_dict, _ = deconstruct_model_proto(request.model_proto, GenericPipeline(nn=self.nn))
 
         caller = self.get_caller(context)
 

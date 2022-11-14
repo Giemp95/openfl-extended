@@ -8,15 +8,13 @@ from logging import getLogger
 from os.path import splitext
 from pathlib import Path
 
+from yaml import SafeDumper
 from yaml import dump
 from yaml import safe_load
-from yaml import SafeDumper
 
+from openfl.component.assigner.custom_assigner import Assigner
 from openfl.interface.aggregation_functions import AggregationFunction
 from openfl.interface.aggregation_functions import WeightedAverage
-from openfl.component.assigner.custom_assigner import Assigner
-from openfl.component.straggler_handling_functions import CutoffTimeBasedStragglerHandling
-from openfl.component.straggler_handling_functions import StragglerHandlingFunction
 from openfl.interface.cli_helper import WORKSPACE
 from openfl.transport import AggregatorGRPCClient
 from openfl.transport import AggregatorGRPCServer
@@ -258,37 +256,37 @@ class Plan:
     # TODO: this should be reintroduced
     def get_assigner(self):
         """Get the plan task assigner."""
-        #aggregation_functions_by_task = None
-        #assigner_function = None
-        #try:
-        #    aggregation_functions_by_task = self.restore_object('aggregation_function_obj.pkl')
-        #    assigner_function = self.restore_object('task_assigner_obj.pkl')
-        #except Exception as exc:
-        #    self.logger.error(f'Failed to load aggregation and assigner functions: {exc}')
-        #    self.logger.info('Using Task Runner API workflow')
-        #if assigner_function:
-        #    self.assigner_ = Assigner(
-        #        assigner_function=assigner_function,
-        #        aggregation_functions_by_task=aggregation_functions_by_task,
-        #        authorized_cols=self.authorized_cols,
-        #        rounds_to_train=self.rounds_to_train,
-        #    )
-        #else:
-        # Backward compatibility
-        defaults = self.config.get(
-            'assigner',
-            {
-                TEMPLATE: 'openfl.component.Assigner',
-                SETTINGS: {}
-            }
-        )
+        aggregation_functions_by_task = None
+        assigner_function = None
+        try:
+            aggregation_functions_by_task = self.restore_object('aggregation_function_obj.pkl')
+            assigner_function = self.restore_object('task_assigner_obj.pkl')
+        except Exception as exc:
+            self.logger.error(f'Failed to load aggregation and assigner functions: {exc}')
+            self.logger.info('Using Task Runner API workflow')
+        if assigner_function:
+            self.assigner_ = Assigner(
+                assigner_function=assigner_function,
+                aggregation_functions_by_task=aggregation_functions_by_task,
+                authorized_cols=self.authorized_cols,
+                rounds_to_train=self.rounds_to_train,
+            )
+        else:
+            # Backward compatibility
+            defaults = self.config.get(
+                'assigner',
+                {
+                    TEMPLATE: 'openfl.component.Assigner',
+                    SETTINGS: {}
+                }
+            )
 
-        defaults[SETTINGS]['authorized_cols'] = self.authorized_cols
-        defaults[SETTINGS]['rounds_to_train'] = self.rounds_to_train
-        defaults[SETTINGS]['tasks'] = self.get_tasks()
+            defaults[SETTINGS]['authorized_cols'] = self.authorized_cols
+            defaults[SETTINGS]['rounds_to_train'] = self.rounds_to_train
+            defaults[SETTINGS]['tasks'] = self.get_tasks()
 
-        if self.assigner_ is None:
-            self.assigner_ = Plan.build(**defaults)
+            if self.assigner_ is None:
+                self.assigner_ = Plan.build(**defaults)
 
         return self.assigner_
 
@@ -365,7 +363,7 @@ class Plan:
                 SETTINGS: {}
             }
         )
-        
+
         if self.straggler_policy_ is None:
             self.straggler_policy_ = Plan.build(**defaults)
 
@@ -424,7 +422,7 @@ class Plan:
                 TEMPLATE: 'openfl.federated.task.task_runner.CoreTaskRunner',
                 SETTINGS: {}
             })
-        defaults['nn'] = nn
+        defaults[SETTINGS]['nn'] = nn
 
         # We are importing a CoreTaskRunner instance!!!
         if self.runner_ is None:
@@ -458,6 +456,7 @@ class Plan:
         defaults[SETTINGS]['collaborator_name'] = collaborator_name
         defaults[SETTINGS]['aggregator_uuid'] = self.aggregator_uuid
         defaults[SETTINGS]['federation_uuid'] = self.federation_uuid
+        defaults[SETTINGS]['nn'] = defaults[SETTINGS]['nn'] if 'nn' in defaults[SETTINGS] else True
 
         if task_runner is not None:
             defaults[SETTINGS]['task_runner'] = task_runner
@@ -467,9 +466,10 @@ class Plan:
             # a part of the New API and it is a part of OpenFL kernel.
             # If Task Runner is placed elsewhere, somewhere in user workspace, than it is
             # a part of the old interface and we follow legacy initialization procedure.
-            # TODO: this switch for AdaBoost shoulf be implemented in a better way
-            if 'openfl.federated.task.task_runner' in self.config['task_runner']['template']\
-                    or 'openfl.federated.task.runner_generic.GenericTaskRunner' in self.config['task_runner']['template']:
+            # TODO: this switch for AdaBoost should be implemented in a better way
+            if 'openfl.federated.task.task_runner' in self.config['task_runner']['template'] \
+                    or 'openfl.federated.task.runner_generic.GenericTaskRunner' in self.config['task_runner'][
+                'template']:
                 # Interactive API
                 model_provider, task_keeper, data_loader = self.deserialize_interface_objects()
                 data_loader = self.initialize_data_loader(data_loader, shard_descriptor)

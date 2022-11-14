@@ -166,7 +166,6 @@ class AggregatorGRPCServer(aggregator_pb2_grpc.AggregatorServicer):
             quit=time_to_quit
         )
 
-    # TODO: qua manca il parametro aggregate
     def GetTensor(self, request, context):  # NOQA:N802
         """
         Request a job from aggregator.

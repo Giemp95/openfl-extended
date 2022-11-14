@@ -282,27 +282,6 @@ class AggregatorGRPCClient:
 
     @_atomic_connection
     @_resend_data_on_reconnection
-    def get_aggregated_tensor(self, collaborator_name, tensor_name, round_number,
-                              report, tags, require_lossless):
-        """Get aggregated tensor from the aggregator."""
-        self._set_header(collaborator_name)
-
-        request = aggregator_pb2.GetAggregatedTensorRequest(
-            header=self.header,
-            tensor_name=tensor_name,
-            round_number=round_number,
-            report=report,
-            tags=tags,
-            require_lossless=require_lossless
-        )
-        response = self.stub.GetAggregatedTensor(request)
-        # also do other validation, like on the round_number
-        self.validate_response(response, collaborator_name)
-
-        return response.tensor
-
-    @_atomic_connection
-    @_resend_data_on_reconnection
     def send_local_task_results(self, collaborator_name, round_number,
                                 task_name, data_size, named_tensors):
         """Send task results to the aggregator."""
