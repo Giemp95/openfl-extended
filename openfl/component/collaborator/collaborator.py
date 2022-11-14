@@ -271,11 +271,18 @@ class Collaborator:
             if task_name == '1_train' or task_name == '2_weak_learners_validate':
                 kwargs['adaboost_coeff'] = self.adaboost_coeff
 
-        global_output_tensor_dict, local_output_tensor_dict, optional = func(
-            col_name=self.collaborator_name,
-            round_num=round_number,
-            input_tensor_dict=input_tensor_dict,
-            **kwargs)
+        if self.nn:
+            global_output_tensor_dict, local_output_tensor_dict = func(
+                col_name=self.collaborator_name,
+                round_num=round_number,
+                input_tensor_dict=input_tensor_dict,
+                **kwargs)
+        else:
+            global_output_tensor_dict, local_output_tensor_dict, optional = func(
+                col_name=self.collaborator_name,
+                round_num=round_number,
+                input_tensor_dict=input_tensor_dict,
+                **kwargs)
 
         # TODO: this should be generalized
         if not self.nn:
