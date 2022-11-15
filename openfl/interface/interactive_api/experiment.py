@@ -63,7 +63,7 @@ class FLExperiment:
 
         self.is_validate_task_exist = False
 
-        self.nn = True
+        self.nn = nn
 
         self.logger = getLogger(__name__)
         setup_logging()

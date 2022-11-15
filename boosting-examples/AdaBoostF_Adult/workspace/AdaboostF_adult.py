@@ -69,7 +69,7 @@ def validate(model, val_loader, device):
 federation = Federation(client_id=client_id, director_node_fqdn=director_node_fqdn, director_port='50052', tls=False)
 fl_experiment = FLExperiment(federation=federation, experiment_name="AdaboostF_Adult",
                              serializer_plugin='openfl.plugins.interface_serializer.dill_serializer.DillSerializer',
-                             load_default_plan=False)
+                             load_default_plan=False, nn=False)
 model_interface = ModelInterface(
     model=AdaBoostF(base_estimator=DecisionTreeClassifier(max_leaf_nodes=10)),
     optimizer=None,
@@ -81,8 +81,7 @@ fl_experiment.start(
     task_keeper=task_interface,
     data_loader=federated_dataset,
     rounds_to_train=300,
-    opt_treatment='CONTINUE_GLOBAL',
-    nn=False,
+    opt_treatment='CONTINUE_GLOBAL'
 )
 
 fl_experiment.stream_metrics(tensorboard_logs=False)
