@@ -260,9 +260,6 @@ class FLExperiment:
     def define_task_assigner(self, task_keeper, rounds_to_train):
         """Define task assigner by registered tasks."""
         tasks = task_keeper.get_registered_tasks()
-        print("*****")
-        print(tasks)
-        print("*****")
         is_train_task_exist = False
         self.is_validate_task_exist = False
         for task in tasks.values():
@@ -476,7 +473,7 @@ class TaskKeeper:
 
     # TODO: maybe in case of AdaBoost.F the adaboost_coeff could be stored in the optimizer parameter
     def register_fl_task(self, model, data_loader, device, optimizer=None, round_num=None, adaboost_coeff=None,
-                         nn=True):
+                         name=None, nn=True):
         """
         Register FL tasks.
 
@@ -515,13 +512,13 @@ class TaskKeeper:
             function_name = training_method.__name__
 
             self.task_registry[function_name] = wrapper_decorator
-            if adaboost_coeff is None:
+            if nn:
                 contract = {'model': model, 'data_loader': data_loader,
                             'device': device, 'optimizer': optimizer, 'round_num': round_num}
             else:
                 contract = {'model': model, 'data_loader': data_loader,
                             'device': device, 'optimizer': optimizer, 'round_num': round_num,
-                            'adaboost_coeff': adaboost_coeff}
+                            'adaboost_coeff': adaboost_coeff, 'name':name}
             self.task_contract[function_name] = contract
             # define tasks
             if nn:
@@ -559,7 +556,7 @@ class TaskKeeper:
                         function_name=function_name,
                         apply_local=True,
                     )
-                elif function_name == 'validate':
+                elif function_name == 'validate_adaboost':
                     self._tasks['4_adaboost_validate'] = ValidateTask(
                         name='4_adaboost_validate',
                         function_name=function_name,

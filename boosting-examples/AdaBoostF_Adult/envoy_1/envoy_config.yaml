@@ -26,4 +26,4 @@ shard_descriptor:
     data_path: ../adult_data
     sample_shape: [ '14' ]
     target_shape: [ '1' ]
-    rank_worldsize: 1, 2
+    rank_worldsize: 1, 10

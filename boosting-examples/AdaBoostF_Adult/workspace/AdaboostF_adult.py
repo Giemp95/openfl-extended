@@ -1,5 +1,6 @@
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score
+import wandb
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from sklearn.tree import DecisionTreeClassifier
 
 from AdultDataset import AdultDataset
@@ -17,8 +18,8 @@ task_interface = TaskInterface()
 
 
 @task_interface.register_fl_task(model='model', data_loader='train_loader', device='device', optimizer='optimizer',
-                                 adaboost_coeff='adaboost_coeff', nn=False)
-def train_adaboost(model, train_loader, device, optimizer, adaboost_coeff):
+                                 adaboost_coeff='adaboost_coeff', name='name', nn=False)
+def train_adaboost(model, train_loader, device, optimizer, adaboost_coeff, name):
     X, y = train_loader
     X, y = np.array(X), np.array(y)
     adaboost_coeff = np.array(adaboost_coeff)
@@ -27,25 +28,38 @@ def train_adaboost(model, train_loader, device, optimizer, adaboost_coeff):
     ids = np.random.choice(X.shape[0], size=X.shape[0], replace=True, p=adaboost_coeff / adaboost_coeff.sum())
     weak_learner.fit(X[ids], y[ids])
 
-    metric = accuracy_score(y, weak_learner.predict(X))
-
+    pred = weak_learner.predict(X)
+    metric = accuracy_score(y, pred)
+    wandb.log({"weak_train_accuracy": accuracy_score(y, pred),
+               "weak_train_precision": precision_score(y, pred, average="macro"),
+               "weak_train_recall": recall_score(y, pred, average="macro"),
+               "weak_train_f1": f1_score(y, pred, average="macro")},
+              commit=False)
     return {'accuracy': metric}
 
 
 @task_interface.register_fl_task(model='model', data_loader='val_loader', device='device',
-                                 adaboost_coeff='adaboost_coeff', nn=False)
-def validate_weak_learners(model, val_loader, device, adaboost_coeff):
+                                 adaboost_coeff='adaboost_coeff', name='name', nn=False)
+def validate_weak_learners(model, val_loader, device, adaboost_coeff, name):
     X, y = val_loader
     X, y = np.array(X), np.array(y)
     adaboost_coeff = np.array(adaboost_coeff)
 
+    rank = int(str(name).split('_')[1]) - 1
+
     error = []
     miss = []
-    for weak_learner in model.get_estimators():
+    for idx, weak_learner in enumerate(model.get_estimators()):
         pred = weak_learner.predict(X)
         mispredictions = y != pred
         error.append(sum(adaboost_coeff[mispredictions]))
         miss.append(mispredictions)
+        if idx == rank:
+            wandb.log({"weak_test_accuracy": accuracy_score(y, pred),
+                       "weak_test_precision": precision_score(y, pred, average="macro"),
+                       "weak_test_recall": recall_score(y, pred, average="macro"),
+                       "weak_test_f1": f1_score(y, pred, average="macro")},
+                      commit=False)
     # TODO: piccolo trick, alla fine di ogni vettore errori viene mandata la norma dei pesi locali
     error.append(sum(adaboost_coeff))
 
@@ -57,11 +71,16 @@ def adaboost_update(model, val_loader, device):
     return {'adaboost_update': 0}
 
 
-@task_interface.register_fl_task(model='model', data_loader='val_loader', device='device', nn=False)
-def validate(model, val_loader, device):
+@task_interface.register_fl_task(model='model', data_loader='val_loader', device='device', name='name', nn=False)
+def validate_adaboost(model, val_loader, device, name):
     X, y = val_loader
     pred = model.predict(np.array(X))
     f1 = f1_score(y, pred, average="macro")
+
+    wandb.log({"test_accuracy": accuracy_score(y, pred),
+               "test_precision": precision_score(y, pred, average="macro"),
+               "test_recall": recall_score(y, pred, average="macro"),
+               "test_f1": f1_score(y, pred, average="macro")})
 
     return {'F1 score': f1}
 

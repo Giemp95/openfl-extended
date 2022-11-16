@@ -80,7 +80,7 @@ tasks:
       retrieve: adaboost_coeff
   4_adaboost_validate:
     aggregation_type: openfl.interface.aggregation_functions.WeightedAverage
-    function: validate
+    function: validate_adaboost
     kwargs:
       apply: local
       data: test

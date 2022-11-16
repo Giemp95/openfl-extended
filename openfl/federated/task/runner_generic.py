@@ -61,8 +61,12 @@ class GenericTaskRunner(CoreTaskRunner):
                 if task_name == "train_adaboost":
                     task_kwargs[task_contract['optimizer']] = None
                     task_kwargs[task_contract['adaboost_coeff']] = kwargs['adaboost_coeff']
+                    task_kwargs[task_contract['name']] = kwargs['name']
                 if task_name == "validate_weak_learners":
                     task_kwargs[task_contract['adaboost_coeff']] = kwargs['adaboost_coeff']
+                    task_kwargs[task_contract['name']] = kwargs['name']
+                if task_name == "validate_adaboost":
+                    task_kwargs[task_contract['name']] = kwargs['name']
 
                 for en_name, entity in zip(['model', 'data_loader', 'device'],
                                            [self.model, loader, device]):

@@ -8,6 +8,7 @@ from time import sleep
 from typing import Tuple
 
 import numpy as np
+import wandb
 
 from openfl.databases import TensorDB
 from openfl.pipelines import NoCompressionPipeline, GenericPipeline
@@ -137,6 +138,15 @@ class Collaborator:
 
         self.task_runner.set_optimizer_treatment(self.opt_treatment.name)
 
+        wandb.init(project='AdaBoost.F', entity='gmittone', group="Adult_2",
+                   config={
+                       "num_clients": 2,
+                       "rounds": 300,
+                       "seed": 1234,
+                   },
+                   name=self.collaborator_name
+                   )
+
     def set_available_devices(self, cuda: Tuple[str] = ()):
         """
         Set available CUDA devices.
@@ -221,7 +231,7 @@ class Collaborator:
             nn=self.nn,
             **kwargs
         )
-        print(required_tensorkeys_relative)
+
         # models actually return "relative" tensorkeys of (name, LOCAL|GLOBAL,
         # round_offset)
         # so we need to update these keys to their "absolute values"
@@ -268,6 +278,7 @@ class Collaborator:
 
         # TODO: this should be generalized
         if not self.nn:
+            kwargs['name'] = self.collaborator_name
             if task_name == '1_train' or task_name == '2_weak_learners_validate':
                 kwargs['adaboost_coeff'] = self.adaboost_coeff
 
