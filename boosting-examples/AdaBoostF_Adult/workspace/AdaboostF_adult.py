@@ -1,3 +1,5 @@
+import argparse
+
 import numpy as np
 import wandb
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
@@ -8,11 +10,14 @@ from adaboost import AdaBoostF
 from openfl.interface.interactive_api.experiment import FLExperiment, TaskInterface, ModelInterface
 from openfl.interface.interactive_api.federation import Federation
 
-random_state = np.random.RandomState(31415)
+parser = argparse.ArgumentParser(description="Script")
+parser.add_argument("--rounds", default=300, type=int)
+parser.add_argument("--server", default='localhost', type=str, help="server address", required=True, )
+args = parser.parse_args()
 
+random_state = np.random.RandomState(args.seed)
 client_id = 'api'
 cert_dir = '../cert'
-director_node_fqdn = 'localhost'
 
 task_interface = TaskInterface()
 
@@ -85,7 +90,7 @@ def validate_adaboost(model, val_loader, device, name):
     return {'F1 score': f1}
 
 
-federation = Federation(client_id=client_id, director_node_fqdn=director_node_fqdn, director_port='50052', tls=False)
+federation = Federation(client_id=client_id, director_node_fqdn=args.server, director_port='50052', tls=False)
 fl_experiment = FLExperiment(federation=federation, experiment_name="AdaboostF_Adult",
                              serializer_plugin='openfl.plugins.interface_serializer.dill_serializer.DillSerializer',
                              load_default_plan=False, nn=False)
@@ -99,7 +104,7 @@ fl_experiment.start(
     model_provider=model_interface,
     task_keeper=task_interface,
     data_loader=federated_dataset,
-    rounds_to_train=300,
+    rounds_to_train=args.rounds,
     opt_treatment='CONTINUE_GLOBAL'
 )
 
