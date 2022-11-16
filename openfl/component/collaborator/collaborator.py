@@ -9,6 +9,7 @@ from typing import Tuple
 
 import numpy as np
 import wandb
+import time
 
 from openfl.databases import TensorDB
 from openfl.pipelines import NoCompressionPipeline, GenericPipeline
@@ -138,15 +139,6 @@ class Collaborator:
 
         self.task_runner.set_optimizer_treatment(self.opt_treatment.name)
 
-        wandb.init(project='AdaBoost.F', entity='gmittone', group="Adult_2",
-                   config={
-                       "num_clients": 2,
-                       "rounds": 300,
-                       "seed": 1234,
-                   },
-                   name=self.collaborator_name
-                   )
-
     def set_available_devices(self, cuda: Tuple[str] = ()):
         """
         Set available CUDA devices.
@@ -157,6 +149,15 @@ class Collaborator:
 
     def run(self):
         """Run the collaborator."""
+        wandb.init(project='AdaBoost.F', entity='gmittone', group="Adult",
+                   config={
+                       "num_clients": 2,
+                       "rounds": 300,
+                       "seed": 1234,
+                   },
+                   name=self.collaborator_name
+                   )
+        start_time = time.time()
         while True:
             tasks, round_number, sleep_time, time_to_quit = self.get_tasks()
             if time_to_quit:
@@ -172,6 +173,8 @@ class Collaborator:
                 self.tensor_db.clean_up(self.db_store_rounds)
 
         self.logger.info('End of Federation reached. Exiting...')
+        print("--- %s seconds ---" % (time.time() - start_time))
+        wandb.finish()
 
     def run_simulation(self):
         """
