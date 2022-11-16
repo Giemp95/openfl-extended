@@ -1,4 +1,4 @@
-# PyTorch_Histology
+    # PyTorch_Histology
 
 ## **How to run this tutorial (without TLC and locally as a simulation):**
 <br/>

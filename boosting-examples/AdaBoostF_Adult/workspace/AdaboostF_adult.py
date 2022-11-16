@@ -17,7 +17,7 @@ task_interface = TaskInterface()
 
 
 @task_interface.register_fl_task(model='model', data_loader='train_loader', device='device', optimizer='optimizer',
-                                 adaboost_coeff='adaboost_coeff')
+                                 adaboost_coeff='adaboost_coeff', nn=False)
 def train_adaboost(model, train_loader, device, optimizer, adaboost_coeff):
     X, y = train_loader
     X, y = np.array(X), np.array(y)
@@ -33,7 +33,7 @@ def train_adaboost(model, train_loader, device, optimizer, adaboost_coeff):
 
 
 @task_interface.register_fl_task(model='model', data_loader='val_loader', device='device',
-                                 adaboost_coeff='adaboost_coeff')
+                                 adaboost_coeff='adaboost_coeff', nn=False)
 def validate_weak_learners(model, val_loader, device, adaboost_coeff):
     X, y = val_loader
     X, y = np.array(X), np.array(y)
@@ -52,12 +52,12 @@ def validate_weak_learners(model, val_loader, device, adaboost_coeff):
     return {'errors': error}, {'misprediction': miss}
 
 
-@task_interface.register_fl_task(model='model', data_loader='val_loader', device='device')
+@task_interface.register_fl_task(model='model', data_loader='val_loader', device='device', nn=False)
 def adaboost_update(model, val_loader, device):
     return {'adaboost_update': 0}
 
 
-@task_interface.register_fl_task(model='model', data_loader='val_loader', device='device')
+@task_interface.register_fl_task(model='model', data_loader='val_loader', device='device', nn=False)
 def validate(model, val_loader, device):
     X, y = val_loader
     pred = model.predict(np.array(X))

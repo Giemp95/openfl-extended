@@ -253,8 +253,7 @@ class Plan:
                 self.hash[:8], 16
             ) % (60999 - 49152) + 49152
 
-    # TODO: this should be reintroduced
-    def get_assigner(self):
+    def get_assigner(self, nn=True):
         """Get the plan task assigner."""
         aggregation_functions_by_task = None
         assigner_function = None
@@ -264,7 +263,7 @@ class Plan:
         except Exception as exc:
             self.logger.error(f'Failed to load aggregation and assigner functions: {exc}')
             self.logger.info('Using Task Runner API workflow')
-        if assigner_function:
+        if assigner_function and nn:
             self.assigner_ = Assigner(
                 assigner_function=assigner_function,
                 aggregation_functions_by_task=aggregation_functions_by_task,
@@ -321,7 +320,8 @@ class Plan:
         defaults[SETTINGS]['aggregator_uuid'] = self.aggregator_uuid
         defaults[SETTINGS]['federation_uuid'] = self.federation_uuid
         defaults[SETTINGS]['authorized_cols'] = self.authorized_cols
-        defaults[SETTINGS]['assigner'] = self.get_assigner()
+        nn = defaults[SETTINGS]['nn'] if 'nn' in defaults[SETTINGS] else True
+        defaults[SETTINGS]['assigner'] = self.get_assigner(nn)
         defaults[SETTINGS]['compression_pipeline'] = self.get_tensor_pipe()
         defaults[SETTINGS]['straggler_handling_policy'] = self.get_straggler_handling_policy()
         log_metric_callback = defaults[SETTINGS].get('log_metric_callback')

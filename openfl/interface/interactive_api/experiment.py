@@ -193,7 +193,7 @@ class FLExperiment:
               delta_updates: bool = False,
               opt_treatment: str = 'RESET',
               device_assignment_policy: str = 'CPU_ONLY',
-            pip_install_options: Tuple[str] = ()) -> None:
+              pip_install_options: Tuple[str] = ()) -> None:
         """
         Prepare workspace distribution and send to Director.
 
@@ -260,6 +260,9 @@ class FLExperiment:
     def define_task_assigner(self, task_keeper, rounds_to_train):
         """Define task assigner by registered tasks."""
         tasks = task_keeper.get_registered_tasks()
+        print("*****")
+        print(tasks)
+        print("*****")
         is_train_task_exist = False
         self.is_validate_task_exist = False
         for task in tasks.values():
@@ -412,7 +415,7 @@ class FLExperiment:
                 'tasks_interface_file': tasks_interface_file,
                 'dataloader_interface_file': dataloader_interface_file,
                 'aggregation_function_interface_file': aggregation_function_interface_file,
-                'task_assigner_file': task_assigner_file if self.nn else None
+                'task_assigner_file': task_assigner_file
             }
         }
 
@@ -472,7 +475,8 @@ class TaskKeeper:
         self._tasks: Dict[str, Task] = {}
 
     # TODO: maybe in case of AdaBoost.F the adaboost_coeff could be stored in the optimizer parameter
-    def register_fl_task(self, model, data_loader, device, optimizer=None, round_num=None, adaboost_coeff=None):
+    def register_fl_task(self, model, data_loader, device, optimizer=None, round_num=None, adaboost_coeff=None,
+                         nn=True):
         """
         Register FL tasks.
 
@@ -509,6 +513,7 @@ class TaskKeeper:
 
             # Saving the task and the contract for later serialization
             function_name = training_method.__name__
+
             self.task_registry[function_name] = wrapper_decorator
             if adaboost_coeff is None:
                 contract = {'model': model, 'data_loader': data_loader,
@@ -519,22 +524,46 @@ class TaskKeeper:
                             'adaboost_coeff': adaboost_coeff}
             self.task_contract[function_name] = contract
             # define tasks
-            if optimizer:
-                self._tasks['train'] = TrainTask(
-                    name='train',
-                    function_name=function_name,
-                )
+            if nn:
+                if optimizer:
+                    self._tasks['train'] = TrainTask(
+                        name='train',
+                        function_name=function_name,
+                    )
+                else:
+                    self._tasks['locally_tuned_model_validate'] = ValidateTask(
+                        name='locally_tuned_model_validate',
+                        function_name=function_name,
+                        apply_local=True,
+                    )
+                    self._tasks['aggregated_model_validate'] = ValidateTask(
+                        name='aggregated_model_validate',
+                        function_name=function_name,
+                    )
+                # We do not alter user environment
             else:
-                self._tasks['locally_tuned_model_validate'] = ValidateTask(
-                    name='locally_tuned_model_validate',
-                    function_name=function_name,
-                    apply_local=True,
-                )
-                self._tasks['aggregated_model_validate'] = ValidateTask(
-                    name='aggregated_model_validate',
-                    function_name=function_name,
-                )
-            # We do not alter user environment
+                if function_name == 'train_adaboost':
+                    self._tasks['1_train'] = TrainTask(
+                        name='1_train',
+                        function_name=function_name,
+                    )
+                elif function_name == 'validate_weak_learners':
+                    self._tasks['2_weak_learners_validate'] = ValidateTask(
+                        name='2_weak_learners_validate',
+                        function_name=function_name,
+                        apply_local=True,
+                    )
+                elif function_name == 'adaboost_update':
+                    self._tasks['3_adaboost_update'] = ValidateTask(
+                        name='3_adaboost_update',
+                        function_name=function_name,
+                        apply_local=True,
+                    )
+                elif function_name == 'validate':
+                    self._tasks['4_adaboost_validate'] = ValidateTask(
+                        name='4_adaboost_validate',
+                        function_name=function_name,
+                    )
 
             return training_method
 

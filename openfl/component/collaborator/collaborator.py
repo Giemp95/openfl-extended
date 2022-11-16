@@ -221,7 +221,7 @@ class Collaborator:
             nn=self.nn,
             **kwargs
         )
-
+        print(required_tensorkeys_relative)
         # models actually return "relative" tensorkeys of (name, LOCAL|GLOBAL,
         # round_offset)
         # so we need to update these keys to their "absolute values"
@@ -244,7 +244,7 @@ class Collaborator:
             required_tensorkeys
         )
         # now we have whatever the model needs to do the task
-        if hasattr(self.task_runner, 'TASK_REGISTRY') and self.nn:
+        if hasattr(self.task_runner, 'TASK_REGISTRY'):
             # New interactive python API
             # New `Core` TaskRunner contains registry of tasks
             func = self.task_runner.TASK_REGISTRY[func_name]

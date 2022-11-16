@@ -44,7 +44,10 @@ def director(context):
 @option('-oc', '--public-cert-path', 'certificate', required=False,
         type=ClickPath(exists=True), default=None,
         help='Path to a signed certificate')
-def start(director_config_path, tls, root_certificate, private_key, certificate):
+@option('-nn', '--neural-network', 'nn', required=False,
+        type=bool, default=True,
+        help='Indicates if the models used are neural networks or not')
+def start(director_config_path, tls, root_certificate, private_key, certificate, nn):
     """Start the director service."""
     director_config_path = Path(director_config_path).absolute()
     logger.info('🧿 Starting the Director Service.')
@@ -96,6 +99,7 @@ def start(director_config_path, tls, root_certificate, private_key, certificate)
         settings=config.settings,
         listen_host=config.settings.listen_host,
         listen_port=config.settings.listen_port,
+        nn=nn
     )
     director_server.start()
 
