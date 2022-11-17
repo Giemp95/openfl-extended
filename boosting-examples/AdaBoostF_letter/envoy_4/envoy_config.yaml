@@ -21,7 +21,7 @@ params:
   cuda_devices: [ ]
 
 shard_descriptor:
-  template: unito.examples.AdaBoostF_letter.workspace.letter_shard_descriptor.letterShardDescriptor
+  template: letter_shard_descriptor.letterShardDescriptor
   params:
     data_path: ../letter_dataset
     sample_shape: [ '16' ]
