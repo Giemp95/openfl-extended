@@ -21,7 +21,7 @@ params:
   cuda_devices: [ ]
 
 shard_descriptor:
-  template: unito.examples.AdaBoostF_segmentation.workspace.segmentation_shard_descriptor.segmentationShardDescriptor
+  template: segmentation_shard_descriptor.segmentationShardDescriptor
   params:
     data_path: ../segmentation_dataset
     sample_shape: [ '19' ]
