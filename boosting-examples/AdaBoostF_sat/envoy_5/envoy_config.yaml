@@ -21,7 +21,7 @@ params:
   cuda_devices: [ ]
 
 shard_descriptor:
-  template: unito.examples.AdaBoostF_sat.workspace.sat_shard_descriptor.satShardDescriptor
+  template: sat_shard_descriptor.satShardDescriptor
   params:
     data_path: ../sat_dataset
     sample_shape: [ '36' ]
