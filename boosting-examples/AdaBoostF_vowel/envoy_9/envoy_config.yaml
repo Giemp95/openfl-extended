@@ -21,7 +21,7 @@ params:
   cuda_devices: [ ]
 
 shard_descriptor:
-  template: unito.examples.AdaBoostF_vowel.workspace.vowel_shard_descriptor.vowelShardDescriptor
+  template: vowel_shard_descriptor.vowelShardDescriptor
   params:
     data_path: ../vowel_dataset
     sample_shape: [ '27' ]

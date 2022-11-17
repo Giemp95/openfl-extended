@@ -19,6 +19,7 @@ parser.add_argument("--server", default='localhost', type=str, help="server addr
 args = parser.parse_args()
 
 random_state = np.random.RandomState(args.seed)
+
 client_id = 'api'
 cert_dir = '../cert'
 
