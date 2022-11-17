@@ -6,9 +6,9 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 from sklearn.tree import DecisionTreeClassifier
 
 from adaboost import AdaBoostF
+from segmentationDataset import segmentationDataset
 from openfl.interface.interactive_api.experiment import FLExperiment, TaskInterface, ModelInterface
 from openfl.interface.interactive_api.federation import Federation
-from segmentationDataset import segmentationDataset
 
 LOG_WANDB = False
 

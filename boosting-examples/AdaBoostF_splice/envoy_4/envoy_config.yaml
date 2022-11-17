@@ -21,7 +21,7 @@ params:
   cuda_devices: [ ]
 
 shard_descriptor:
-  template: unito.examples.AdaBoostF_splice.workspace.splice_shard_descriptor.spliceShardDescriptor
+  template: splice_shard_descriptor.spliceShardDescriptor
   params:
     data_path: ../splice_dataset
     sample_shape: [ '61' ]
