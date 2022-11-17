@@ -21,7 +21,7 @@ params:
   cuda_devices: [ ]
 
 shard_descriptor:
-  template: unito.examples.AdaBoostF_vehicle.workspace.vehicle_shard_descriptor.vehicleShardDescriptor
+  template: vehicle_shard_descriptor.vehicleShardDescriptor
   params:
     data_path: ../vehicle_dataset
     sample_shape: [ '18' ]
