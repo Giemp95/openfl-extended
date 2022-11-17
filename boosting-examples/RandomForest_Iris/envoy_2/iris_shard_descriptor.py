@@ -17,13 +17,16 @@ logger = logging.getLogger(__name__)
 class IrisShardDataset(ShardDataset):
     """Mnist Shard dataset class."""
 
-    def __init__(self, x, y, data_type, rank=1, worldsize=1):
+    def __init__(self, x, y, data_type, rank=1, worldsize=1, complete=False):
         """Initialize TinyImageNetDataset."""
         self.data_type = data_type
         self.rank = rank
         self.worldsize = worldsize
-        self.x = x[self.rank - 1::self.worldsize]
-        self.y = y[self.rank - 1::self.worldsize]
+        self.x = x if complete else x[self.rank - 1::self.worldsize]
+        self.y = y if complete else y[self.rank - 1::self.worldsize]
+
+    def get_data(self):
+        return self.x, self.y
 
     def __getitem__(self, index: int):
         """Return an item by the index."""
@@ -44,7 +47,8 @@ class IrisShardDescriptor(ShardDescriptor):
     ):
         """Initialize MnistShardDescriptor."""
         self.rank, self.worldsize = tuple(int(num) for num in rank_worldsize.split(','))
-        (x_train, y_train), (x_test, y_test) = self.download_data()
+        x_train, x_test, y_train, y_test = self.download_data()
+
         self.data_by_type = {
             'train': (x_train, y_train),
             'val': (x_test, y_test)
@@ -54,7 +58,7 @@ class IrisShardDescriptor(ShardDescriptor):
         """Get available shard dataset types."""
         return list(self.data_by_type)
 
-    def get_dataset(self, dataset_type='train'):
+    def get_dataset(self, dataset_type='train', complete=False):
         """Return a shard dataset by type."""
         if dataset_type not in self.data_by_type:
             raise Exception(f'Wrong dataset type: {dataset_type}')
@@ -62,7 +66,8 @@ class IrisShardDescriptor(ShardDescriptor):
             *self.data_by_type[dataset_type],
             data_type=dataset_type,
             rank=self.rank,
-            worldsize=self.worldsize
+            worldsize=self.worldsize,
+            complete=complete
         )
 
     @property
@@ -84,7 +89,7 @@ class IrisShardDescriptor(ShardDescriptor):
     def download_data(self):
         iris = pd.read_csv("../iris_dataset/iris_data")
 
-        X, y = iris.iloc[:, :-1], iris.iloc[:, -1]
+        X, y = iris.iloc[:, :-1].to_numpy(), iris.iloc[:, -1].to_numpy()
 
         x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
-        return (x_train, y_train), (x_test, y_test)
+        return x_train, x_test, y_train, y_test

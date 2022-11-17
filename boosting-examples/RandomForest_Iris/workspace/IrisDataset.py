@@ -1,17 +1,9 @@
 from openfl.interface.interactive_api.experiment import DataInterface
-from sklearn.datasets import load_iris
-from sklearn.model_selection import train_test_split
 
 
 class IrisDataset(DataInterface):
-    def __init__(self, random_state=42, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        iris = load_iris()
-        X, y = iris.data, iris.target
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.3,
-                                                                                random_state=random_state,
-                                                                                shuffle=True)
 
     @property
     def shard_descriptor(self):
@@ -27,26 +19,35 @@ class IrisDataset(DataInterface):
         """
         self._shard_descriptor = shard_descriptor
 
+        self.train = shard_descriptor.get_dataset('train')
+        self.test = shard_descriptor.get_dataset('val', complete=True)
+
+    def __getitem__(self, index):
+        return self.shard_descriptor[index]
+
+    def __len__(self):
+        return len(self.shard_descriptor)
+
     def get_train_loader(self, **kwargs):
         """
         Output of this method will be provided to tasks with optimizer in contract
         """
-        return self.X_train, self.y_train
+        return self.train.get_data()
 
     def get_valid_loader(self, **kwargs):
         """
         Output of this method will be provided to tasks without optimizer in contract
         """
-        return self.X_test, self.y_test
+        return self.test.get_data()
 
     def get_train_data_size(self):
         """
         Information for aggregation
         """
-        return len(self.X_train)
+        return len(self.train)
 
     def get_valid_data_size(self):
         """
         Information for aggregation
         """
-        return len(self.X_test)
+        return len(self.test)

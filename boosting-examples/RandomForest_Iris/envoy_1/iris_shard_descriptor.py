@@ -6,16 +6,15 @@
 import logging
 from typing import List
 
+import pandas as pd
 from openfl.interface.interactive_api.shard_descriptor import ShardDataset
 from openfl.interface.interactive_api.shard_descriptor import ShardDescriptor
-from sklearn.datasets import load_svmlight_file
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 
 logger = logging.getLogger(__name__)
 
 
-class vowelShardDataset(ShardDataset):
+class IrisShardDataset(ShardDataset):
     """Mnist Shard dataset class."""
 
     def __init__(self, x, y, data_type, rank=1, worldsize=1, complete=False):
@@ -38,7 +37,7 @@ class vowelShardDataset(ShardDataset):
         return len(self.x)
 
 
-class vowelShardDescriptor(ShardDescriptor):
+class IrisShardDescriptor(ShardDescriptor):
     """Mnist Shard descriptor class."""
 
     def __init__(
@@ -63,7 +62,7 @@ class vowelShardDescriptor(ShardDescriptor):
         """Return a shard dataset by type."""
         if dataset_type not in self.data_by_type:
             raise Exception(f'Wrong dataset type: {dataset_type}')
-        return vowelShardDataset(
+        return IrisShardDataset(
             *self.data_by_type[dataset_type],
             data_type=dataset_type,
             rank=self.rank,
@@ -74,7 +73,7 @@ class vowelShardDescriptor(ShardDescriptor):
     @property
     def sample_shape(self):
         """Return the sample shape info."""
-        return ['27']
+        return ['4']
 
     @property
     def target_shape(self):
@@ -84,13 +83,13 @@ class vowelShardDescriptor(ShardDescriptor):
     @property
     def dataset_description(self) -> str:
         """Return the dataset description."""
-        return (f'Adult dataset, shard number {self.rank}'
+        return (f'Iris dataset, shard number {self.rank}'
                 f' out of {self.worldsize}')
 
     def download_data(self):
-        X, y = load_svmlight_file("../vowel_dataset/vowel.svmlight")
-        X = X.toarray()
-        y = y.astype("int")
-        y = LabelEncoder().fit_transform(y)
+        iris = pd.read_csv("../iris_dataset/iris_data")
 
-        return train_test_split(X, y, test_size=0.2)
+        X, y = iris.iloc[:, :-1].to_numpy(), iris.iloc[:, -1].to_numpy()
+
+        x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
+        return x_train, x_test, y_train, y_test

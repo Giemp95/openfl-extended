@@ -21,7 +21,7 @@ params:
   cuda_devices: []
 
 shard_descriptor:
-  template: unito.examples.RandomForest_Iris.workspace.iris_shard_descriptor.IrisShardDescriptor
+  template: iris_shard_descriptor.IrisShardDescriptor
   params:
     data_path: unito.examples.RandomForest_Iris.iris_dataset.iris_data
     sample_shape: ['4']
