@@ -2,15 +2,14 @@ import numpy as np
 
 
 class AdaBoostF:
-    def __init__(self, base_estimator):
+    def __init__(self, base_estimator, n_classes):
         self.estimators_ = [base_estimator]
+        self.n_estimators_ = 1
         self.estimator_weights_ = [1]
+        self.n_classes = n_classes
 
     def get_estimators(self):
         return self.estimators_
-
-    def get_estimator_number(self):
-        return len(self.estimators_)
 
     def add(self, weak_learner, coeff):
         self.estimators_.append(weak_learner)
@@ -22,10 +21,11 @@ class AdaBoostF:
     def replace(self, weak_learner, coeff):
         self.estimators_ = [weak_learner]
         self.estimator_weights_ = np.array([coeff])
+
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        y_pred = np.zeros((np.shape(X)[0], 2))
+        y_pred = np.zeros((np.shape(X)[0], self.n_classes))
         for i, clf in enumerate(self.estimators_):
             pred = clf.predict(X)
             for j, c in enumerate(pred):

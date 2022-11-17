@@ -101,7 +101,7 @@ fl_experiment = FLExperiment(federation=federation, experiment_name="AdaboostF_F
                              serializer_plugin='openfl.plugins.interface_serializer.dill_serializer.DillSerializer',
                              load_default_plan=False, nn=False)
 model_interface = ModelInterface(
-    model=AdaBoostF(base_estimator=DecisionTreeClassifier(max_leaf_nodes=10)),
+    model=AdaBoostF(base_estimator=DecisionTreeClassifier(max_leaf_nodes=10), n_classes=2),
     optimizer=None,
     framework_plugin='openfl.plugins.frameworks_adapters.generic_adapter.GenericAdapter')
 federated_dataset = forestcoverDataset()
