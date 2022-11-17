@@ -21,7 +21,7 @@ params:
   cuda_devices: [ ]
 
 shard_descriptor:
-  template: unito.examples.AdaBoostF_pendigits.workspace.pendigits_shard_descriptor.pendigitsShardDescriptor
+  template: pendigits_shard_descriptor.pendigitsShardDescriptor
   params:
     data_path: ../pendigits_dataset
     sample_shape: [ '16' ]
