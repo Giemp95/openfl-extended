@@ -10,9 +10,12 @@ from adaboost import AdaBoostF
 from openfl.interface.interactive_api.experiment import FLExperiment, TaskInterface, ModelInterface
 from openfl.interface.interactive_api.federation import Federation
 
+LOG_WANDB = False
+
 parser = argparse.ArgumentParser(description="Script")
-parser.add_argument("--rounds", default=300, type=int)
-parser.add_argument("--server", default='localhost', type=str, help="server address", required=True, )
+parser.add_argument("--rounds", default=3, type=int)
+parser.add_argument("--seed", default=42, type=int)
+parser.add_argument("--server", default='localhost', type=str, help="server address")
 args = parser.parse_args()
 
 random_state = np.random.RandomState(args.seed)
@@ -35,11 +38,12 @@ def train_adaboost(model, train_loader, device, optimizer, adaboost_coeff, name)
 
     pred = weak_learner.predict(X)
     metric = accuracy_score(y, pred)
-    wandb.log({"weak_train_accuracy": accuracy_score(y, pred),
-               "weak_train_precision": precision_score(y, pred, average="macro"),
-               "weak_train_recall": recall_score(y, pred, average="macro"),
-               "weak_train_f1": f1_score(y, pred, average="macro")},
-              commit=False)
+    if LOG_WANDB:
+        wandb.log({"weak_train_accuracy": accuracy_score(y, pred),
+                   "weak_train_precision": precision_score(y, pred, average="macro"),
+                   "weak_train_recall": recall_score(y, pred, average="macro"),
+                   "weak_train_f1": f1_score(y, pred, average="macro")},
+                  commit=False)
     return {'accuracy': metric}
 
 
@@ -60,11 +64,12 @@ def validate_weak_learners(model, val_loader, device, adaboost_coeff, name):
         error.append(sum(adaboost_coeff[mispredictions]))
         miss.append(mispredictions)
         if idx == rank:
-            wandb.log({"weak_test_accuracy": accuracy_score(y, pred),
-                       "weak_test_precision": precision_score(y, pred, average="macro"),
-                       "weak_test_recall": recall_score(y, pred, average="macro"),
-                       "weak_test_f1": f1_score(y, pred, average="macro")},
-                      commit=False)
+            if LOG_WANDB:
+                wandb.log({"weak_test_accuracy": accuracy_score(y, pred),
+                           "weak_test_precision": precision_score(y, pred, average="macro"),
+                           "weak_test_recall": recall_score(y, pred, average="macro"),
+                           "weak_test_f1": f1_score(y, pred, average="macro")},
+                          commit=False)
     # TODO: piccolo trick, alla fine di ogni vettore errori viene mandata la norma dei pesi locali
     error.append(sum(adaboost_coeff))
 
@@ -82,10 +87,11 @@ def validate_adaboost(model, val_loader, device, name):
     pred = model.predict(np.array(X))
     f1 = f1_score(y, pred, average="macro")
 
-    wandb.log({"test_accuracy": accuracy_score(y, pred),
-               "test_precision": precision_score(y, pred, average="macro"),
-               "test_recall": recall_score(y, pred, average="macro"),
-               "test_f1": f1_score(y, pred, average="macro")})
+    if LOG_WANDB:
+        wandb.log({"test_accuracy": accuracy_score(y, pred),
+                   "test_precision": precision_score(y, pred, average="macro"),
+                   "test_recall": recall_score(y, pred, average="macro"),
+                   "test_f1": f1_score(y, pred, average="macro")})
 
     return {'F1 score': f1}
 

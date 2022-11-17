@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Collaborator module."""
+import time
 from enum import Enum
 from logging import getLogger
 from time import sleep
@@ -9,13 +10,14 @@ from typing import Tuple
 
 import numpy as np
 import wandb
-import time
 
 from openfl.databases import TensorDB
 from openfl.pipelines import NoCompressionPipeline, GenericPipeline
 from openfl.pipelines import TensorCodec
 from openfl.protocols import utils
 from openfl.utilities import TensorKey
+
+LOG_WANDB = False
 
 
 class DevicePolicy(Enum):
@@ -149,14 +151,15 @@ class Collaborator:
 
     def run(self):
         """Run the collaborator."""
-        wandb.init(project='AdaBoost.F', entity='gmittone', group="Adult",
-                   config={
-                       "num_clients": 2,
-                       "rounds": 300,
-                       "seed": 1234,
-                   },
-                   name=self.collaborator_name
-                   )
+        if LOG_WANDB:
+            wandb.init(project='AdaBoost.F', entity='gmittone', group="Adult",
+                       config={
+                           "num_clients": 2,
+                           "rounds": 300,
+                           "seed": 1234,
+                       },
+                       name=self.collaborator_name
+                       )
         start_time = time.time()
         while True:
             tasks, round_number, sleep_time, time_to_quit = self.get_tasks()
@@ -174,7 +177,8 @@ class Collaborator:
 
         self.logger.info('End of Federation reached. Exiting...')
         print("--- %s seconds ---" % (time.time() - start_time))
-        wandb.finish()
+        if LOG_WANDB:
+            wandb.finish()
 
     def run_simulation(self):
         """

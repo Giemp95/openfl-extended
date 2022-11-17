@@ -21,7 +21,7 @@ params:
   cuda_devices: [ ]
 
 shard_descriptor:
-  template: unito.examples.AdaBoostF_forestcover.workspace.forestcover_shard_descriptor.forestcoverShardDescriptor
+  template: forestcover_shard_descriptor.forestcoverShardDescriptor
   params:
     data_path: ../forestcover_dataset
     sample_shape: [ '54' ]
