@@ -139,7 +139,7 @@ setup(
         'docker',
         'dynaconf==3.1.7',
         'flatten_json',
-        #'grpcio~=1.48.2',
+        'grpcio~=1.48.2',
         'ipykernel',
         'jupyterlab',
         'numpy',
@@ -152,7 +152,7 @@ setup(
         'tensorboardX',
         'tqdm',
     ],
-    #setup_requires=['grpcio-tools~=1.48.2'],
+    setup_requires=['grpcio-tools~=1.48.2'],
     python_requires='>=3.6, <3.11',
     project_urls={
         'Bug Tracker': 'https://github.com/intel/openfl/issues',
