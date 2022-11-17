@@ -22,7 +22,6 @@ random_state = np.random.RandomState(args.seed)
 
 client_id = 'api'
 cert_dir = '../cert'
-director_node_fqdn = 'localhost'
 
 task_interface = TaskInterface()
 
