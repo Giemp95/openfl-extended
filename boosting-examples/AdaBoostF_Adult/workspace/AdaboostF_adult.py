@@ -40,9 +40,9 @@ def train_adaboost(model, train_loader, device, optimizer, adaboost_coeff, name)
     metric = accuracy_score(y, pred)
     if LOG_WANDB:
         wandb.log({"weak_train_accuracy": accuracy_score(y, pred),
-                   "weak_train_precision": precision_score(y, pred, average="macro"),
-                   "weak_train_recall": recall_score(y, pred, average="macro"),
-                   "weak_train_f1": f1_score(y, pred, average="macro")},
+                   "weak_train_precision": precision_score(y, pred, average="micro"),
+                   "weak_train_recall": recall_score(y, pred, average="micro"),
+                   "weak_train_f1": f1_score(y, pred, average="micro")},
                   commit=False)
     return {'accuracy': metric}
 
@@ -66,9 +66,9 @@ def validate_weak_learners(model, val_loader, device, adaboost_coeff, name):
         if idx == rank:
             if LOG_WANDB:
                 wandb.log({"weak_test_accuracy": accuracy_score(y, pred),
-                           "weak_test_precision": precision_score(y, pred, average="macro"),
-                           "weak_test_recall": recall_score(y, pred, average="macro"),
-                           "weak_test_f1": f1_score(y, pred, average="macro")},
+                           "weak_test_precision": precision_score(y, pred, average="micro"),
+                           "weak_test_recall": recall_score(y, pred, average="micro"),
+                           "weak_test_f1": f1_score(y, pred, average="micro")},
                           commit=False)
     # TODO: piccolo trick, alla fine di ogni vettore errori viene mandata la norma dei pesi locali
     error.append(sum(adaboost_coeff))
@@ -85,13 +85,13 @@ def adaboost_update(model, val_loader, device):
 def validate_adaboost(model, val_loader, device, name):
     X, y = val_loader
     pred = model.predict(np.array(X))
-    f1 = f1_score(y, pred, average="macro")
+    f1 = f1_score(y, pred, average="micro")
 
     if LOG_WANDB:
         wandb.log({"test_accuracy": accuracy_score(y, pred),
-                   "test_precision": precision_score(y, pred, average="macro"),
-                   "test_recall": recall_score(y, pred, average="macro"),
-                   "test_f1": f1_score(y, pred, average="macro")})
+                   "test_precision": precision_score(y, pred, average="micro"),
+                   "test_recall": recall_score(y, pred, average="micro"),
+                   "test_f1": f1_score(y, pred, average="micro")})
 
     return {'F1 score': f1}
 
@@ -106,13 +106,14 @@ model_interface = ModelInterface(
     framework_plugin='openfl.plugins.frameworks_adapters.generic_adapter.GenericAdapter')
 federated_dataset = AdultDataset()
 
-fl_experiment.start(
-    model_provider=model_interface,
-    task_keeper=task_interface,
-    data_loader=federated_dataset,
-    rounds_to_train=args.rounds,
-    opt_treatment='CONTINUE_GLOBAL'
-)
+for _ in range(10):
+    fl_experiment.start(
+        model_provider=model_interface,
+        task_keeper=task_interface,
+        data_loader=federated_dataset,
+        rounds_to_train=args.rounds,
+        opt_treatment='CONTINUE_GLOBAL'
+    )
 
-fl_experiment.stream_metrics(tensorboard_logs=False)
-fl_experiment.remove_experiment_data()
+    fl_experiment.stream_metrics(tensorboard_logs=False)
+    fl_experiment.remove_experiment_data()
