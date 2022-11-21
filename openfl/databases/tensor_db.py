@@ -66,17 +66,17 @@ class TensorDB:
             # Getting a negative argument calls off cleaning
             return
         current_round = self.tensor_db['round'].astype(int).max()
+        print("current round: ", current_round)
+        print("remove_older_than: ", remove_older_than)
         if current_round == ROUND_PLACEHOLDER:
             current_round = np.sort(self.tensor_db['round'].astype(int).unique())[-2]
         if self.nn:
             self.tensor_db = self.tensor_db[
-                (self.tensor_db['round'].astype(int) > current_round - remove_older_than) |
-                (self.tensor_db['report'] == True)
+                (self.tensor_db['round'].astype(int) > current_round - remove_older_than)
                 ].reset_index(drop=True)
         else:
             self.tensor_db = self.tensor_db[
                 (self.tensor_db['round'].astype(int) > current_round - remove_older_than) |
-                (self.tensor_db['report'] == True) |
                 (self.tensor_db['tags'] == ('weak_learner',))
                 ].reset_index(drop=True)
         print("--- %s seconds for clean_up ---" % (time.time() - start_time))
