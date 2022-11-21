@@ -1,5 +1,4 @@
 import argparse
-import time
 
 import numpy as np
 import wandb
@@ -83,11 +82,9 @@ def adaboost_update(model, val_loader, device):
 
 
 @task_interface.register_fl_task(model='model', data_loader='val_loader', device='device', name='name', nn=False)
-def validate_adaboost(model, val_loader, device, name, pool):
+def validate_adaboost(model, val_loader, device, name):
     X, y = val_loader
-    start_time = time.time()
-    pred = model.predict(np.array(X), pool)
-    print("--- %s seconds ---" % (time.time() - start_time))
+    pred = model.predict(np.array(X))
     f1 = f1_score(y, pred, average="micro")
 
     if LOG_WANDB:
