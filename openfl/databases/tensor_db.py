@@ -3,7 +3,6 @@
 
 """TensorDB Module."""
 
-import time
 from threading import Lock
 from types import MethodType
 from typing import Dict
@@ -60,10 +59,6 @@ class TensorDB:
         return self.__repr__()
 
     def clean_up(self, remove_older_than: int = 1) -> None:
-        print("TensorDB size before: ", str(len(self.tensor_db)))
-        pd.set_option('display.max_columns', None)
-        print(self.tensor_db)
-        start_time = time.time()
         """Remove old entries from database preventing the db from becoming too large and slow."""
         if remove_older_than < 0:
             # Getting a negative argument calls off cleaning
@@ -85,11 +80,8 @@ class TensorDB:
                 self.tensor_db = self.tensor_db[
                     (self.tensor_db['round'].astype(int) > current_round - remove_older_than)
                 ].reset_index(drop=True)
-        print("--- %s seconds for clean_up ---" % (time.time() - start_time))
-        print("TensorDB size after: ", str(len(self.tensor_db)))
 
     def cache_tensor(self, tensor_key_dict: Dict[TensorKey, np.ndarray]) -> None:
-        start_time = time.time()
         """Insert tensor into TensorDB (dataframe).
 
         Args:
@@ -119,10 +111,8 @@ class TensorDB:
             self.tensor_db = pd.concat(
                 [self.tensor_db, *entries_to_add], ignore_index=True
             )
-        print("--- %s seconds for cache_tensor---" % (time.time() - start_time))
 
     def get_tensor_from_cache(self, tensor_key: TensorKey) -> Optional[np.ndarray]:
-        start_time = time.time()
         """
         Perform a lookup of the tensor_key in the TensorDB.
 
@@ -146,14 +136,11 @@ class TensorDB:
         else:
             result = df['nparray'].iloc[0]
 
-        print("--- %s seconds for get_tensor_from_cache ---" % (time.time() - start_time))
-
         return result
 
     def get_aggregated_tensor(self, tensor_key: TensorKey, collaborator_weight_dict: dict,
                               aggregation_function: AggregationFunction
                               ) -> Optional[np.ndarray]:
-        start_time = time.time()
         """
         Determine whether all of the collaborator tensors are present for a given tensor key.
 
@@ -241,19 +228,15 @@ class TensorDB:
         else:
             result = agg_nparray
 
-        print("--- %s seconds for get_aggregated_tensor ---" % (time.time() - start_time))
-
         return result
 
     # @TODO: this is also to be generalised
     def get_errors(self, round_number):
-        start_time = time.time()
         df = self.tensor_db[(self.tensor_db['tensor_name'] == "errors")
                             & (self.tensor_db['round'] == round_number)]
 
         if len(df) == 0:
             return None
-        print("--- %s seconds for get_errors ---" % (time.time() - start_time))
         return df["nparray"].to_numpy()
 
     def _iterate(self, order_by: str = 'round', ascending: bool = False) -> Iterator[pd.Series]:
