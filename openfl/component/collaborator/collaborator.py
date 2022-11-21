@@ -17,7 +17,7 @@ from openfl.pipelines import TensorCodec
 from openfl.protocols import utils
 from openfl.utilities import TensorKey
 
-LOG_WANDB = False
+LOG_WANDB = True
 
 
 class DevicePolicy(Enum):
@@ -152,9 +152,9 @@ class Collaborator:
     def run(self):
         """Run the collaborator."""
         if LOG_WANDB:
-            wandb.init(project='AdaBoost.F', entity='gmittone', group="Adult",
+            wandb.init(project='AdaBoost.F', entity='gmittone', group="Krvskp",
                        config={
-                           "num_clients": 2,
+                           "num_clients": 10,
                            "rounds": 300,
                            "seed": 1234,
                        },

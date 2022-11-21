@@ -10,7 +10,7 @@ from krvskpDataset import krvskpDataset
 from openfl.interface.interactive_api.experiment import FLExperiment, TaskInterface, ModelInterface
 from openfl.interface.interactive_api.federation import Federation
 
-LOG_WANDB = False
+LOG_WANDB = True
 
 parser = argparse.ArgumentParser(description="Script")
 parser.add_argument("--rounds", default=3, type=int)
