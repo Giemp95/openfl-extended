@@ -59,15 +59,12 @@ class TensorDB:
         return self.__repr__()
 
     def clean_up(self, remove_older_than: int = 1) -> None:
-        print(self.tensor_db)
         start_time = time.time()
         """Remove old entries from database preventing the db from becoming too large and slow."""
         if remove_older_than < 0:
             # Getting a negative argument calls off cleaning
             return
         current_round = self.tensor_db['round'].astype(int).max()
-        print("current round: ", current_round)
-        print("remove_older_than: ", remove_older_than)
         if current_round == ROUND_PLACEHOLDER:
             current_round = np.sort(self.tensor_db['round'].astype(int).unique())[-2]
         if self.nn:
@@ -82,7 +79,6 @@ class TensorDB:
         print("--- %s seconds for clean_up ---" % (time.time() - start_time))
 
     def cache_tensor(self, tensor_key_dict: Dict[TensorKey, np.ndarray]) -> None:
-        print(self.tensor_db)
         start_time = time.time()
         """Insert tensor into TensorDB (dataframe).
 
@@ -116,7 +112,6 @@ class TensorDB:
         print("--- %s seconds for cache_tensor---" % (time.time() - start_time))
 
     def get_tensor_from_cache(self, tensor_key: TensorKey) -> Optional[np.ndarray]:
-        print(self.tensor_db)
         start_time = time.time()
         """
         Perform a lookup of the tensor_key in the TensorDB.
@@ -148,7 +143,6 @@ class TensorDB:
     def get_aggregated_tensor(self, tensor_key: TensorKey, collaborator_weight_dict: dict,
                               aggregation_function: AggregationFunction
                               ) -> Optional[np.ndarray]:
-        print(self.tensor_db)
         start_time = time.time()
         """
         Determine whether all of the collaborator tensors are present for a given tensor key.
@@ -243,7 +237,6 @@ class TensorDB:
 
     # @TODO: this is also to be generalised
     def get_errors(self, round_number):
-        print(self.tensor_db)
         start_time = time.time()
         df = self.tensor_db[(self.tensor_db['tensor_name'] == "errors")
                             & (self.tensor_db['round'] == round_number)]

@@ -952,6 +952,7 @@ class Aggregator:
             self.logger.info(f'Starting round {self.round_number}...')
 
         # Cleaning tensor db
+        print({self.tensor_db})
         self.tensor_db.clean_up(self.db_store_rounds)
 
     def _is_task_done(self, task_name, round_number=None):
