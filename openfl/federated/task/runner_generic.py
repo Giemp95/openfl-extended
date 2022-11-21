@@ -67,7 +67,6 @@ class GenericTaskRunner(CoreTaskRunner):
                     task_kwargs[task_contract['name']] = kwargs['name']
                 if task_name == "validate_adaboost":
                     task_kwargs[task_contract['name']] = kwargs['name']
-                    task_kwargs[task_contract['pool']] = kwargs['pool']
 
                 for en_name, entity in zip(['model', 'data_loader', 'device'],
                                            [self.model, loader, device]):

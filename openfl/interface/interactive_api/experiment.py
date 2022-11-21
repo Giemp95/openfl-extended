@@ -473,7 +473,7 @@ class TaskKeeper:
 
     # TODO: maybe in case of AdaBoost.F the adaboost_coeff could be stored in the optimizer parameter
     def register_fl_task(self, model, data_loader, device, optimizer=None, round_num=None, adaboost_coeff=None,
-                         name=None, pool=None, nn=True):
+                         name=None, nn=True):
         """
         Register FL tasks.
 
@@ -518,7 +518,7 @@ class TaskKeeper:
             else:
                 contract = {'model': model, 'data_loader': data_loader,
                             'device': device, 'optimizer': optimizer, 'round_num': round_num,
-                            'adaboost_coeff': adaboost_coeff, 'name': name, 'pool': pool}
+                            'adaboost_coeff': adaboost_coeff, 'name': name}
             self.task_contract[function_name] = contract
             # define tasks
             if nn:

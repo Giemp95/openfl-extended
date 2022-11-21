@@ -5,7 +5,6 @@
 import time
 from enum import Enum
 from logging import getLogger
-from multiprocessing import Pool
 from time import sleep
 from typing import Tuple
 
@@ -104,7 +103,6 @@ class Collaborator:
             self.compression_pipeline = compression_pipeline or NoCompressionPipeline()
         else:
             self.compression_pipeline = GenericPipeline(self.nn)
-            self.pool = Pool()
 
         self.tensor_codec = TensorCodec(self.compression_pipeline)
         self.tensor_db = TensorDB(self.nn, agg=False)
@@ -290,8 +288,6 @@ class Collaborator:
             kwargs['name'] = self.collaborator_name
             if task_name == '1_train' or task_name == '2_weak_learners_validate':
                 kwargs['adaboost_coeff'] = self.adaboost_coeff
-            if task_name == '4_adaboost_validate':
-                kwargs['pool'] = self.pool
 
         if self.nn:
             global_output_tensor_dict, local_output_tensor_dict = func(

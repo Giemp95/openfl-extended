@@ -82,8 +82,7 @@ def adaboost_update(model, val_loader, device):
     return {'adaboost_update': 0}
 
 
-@task_interface.register_fl_task(model='model', data_loader='val_loader', device='device', name='name', pool='pool',
-                                 nn=False)
+@task_interface.register_fl_task(model='model', data_loader='val_loader', device='device', name='name', nn=False)
 def validate_adaboost(model, val_loader, device, name, pool):
     X, y = val_loader
     start_time = time.time()

@@ -24,18 +24,10 @@ class AdaBoostF:
 
         return self
 
-    @staticmethod
-    def single_pred(arg):
-        i, clf, X = arg
-        return i, clf.predict(X)
-
-    def predict(self, X: np.ndarray, pool) -> np.ndarray:
+    def predict(self, X: np.ndarray) -> np.ndarray:
         y_pred = np.zeros((np.shape(X)[0], self.n_classes))
-        args = [(i, clf, X) for i, clf in enumerate(self.estimators_)]
-
-        results = pool.map(self.single_pred, args)
-
-        for i, pred in results:
+        for i, clf in enumerate(self.estimators_):
+            pred = clf.predict(X)
             for j, c in enumerate(pred):
                 y_pred[j, int(c)] += self.estimator_weights_[i]
         return np.argmax(y_pred, axis=1)
