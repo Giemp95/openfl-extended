@@ -246,7 +246,7 @@ class Aggregator:
             sleep_time: int
         """
         # Decrease sleep period for finer discretezation
-        return 10
+        return 1
 
     def _time_to_quit(self):
         """
@@ -407,9 +407,9 @@ class Aggregator:
         while (nparray is None):
             self.logger.debug(f'Waiting for tensor_key {agg_tensor_key}')
             self.logger.debug(f'This is tensor_db: {self.tensor_db}')
-            time.sleep(5)
+            time.sleep(1)
             nparray = self.tensor_db.get_tensor_from_cache(agg_tensor_key)
-            if (time.time() - start_retrieving_time) > 60:
+            if (time.time() - start_retrieving_time) > 180:
                 break
 
         if nparray is None:
@@ -941,8 +941,9 @@ class Aggregator:
         self.stragglers_for_task = {}
 
         # Save the latest model
-        self.logger.info(f'Saving round {self.round_number} model...')
-        self._save_model(self.round_number, self.last_state_path)
+        if self.nn:
+            self.logger.info(f'Saving round {self.round_number} model...')
+            self._save_model(self.round_number, self.last_state_path)
 
         # TODO This needs to be fixed!
         if self._time_to_quit():

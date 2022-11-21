@@ -106,14 +106,13 @@ model_interface = ModelInterface(
     framework_plugin='openfl.plugins.frameworks_adapters.generic_adapter.GenericAdapter')
 federated_dataset = AdultDataset()
 
-for _ in range(10):
-    fl_experiment.start(
-        model_provider=model_interface,
-        task_keeper=task_interface,
-        data_loader=federated_dataset,
-        rounds_to_train=args.rounds,
-        opt_treatment='CONTINUE_GLOBAL'
-    )
+fl_experiment.start(
+    model_provider=model_interface,
+    task_keeper=task_interface,
+    data_loader=federated_dataset,
+    rounds_to_train=args.rounds,
+    opt_treatment='CONTINUE_GLOBAL'
+)
 
-    fl_experiment.stream_metrics(tensorboard_logs=False)
-    fl_experiment.remove_experiment_data()
+fl_experiment.stream_metrics(tensorboard_logs=False)
+fl_experiment.remove_experiment_data()

@@ -346,7 +346,7 @@ class Collaborator:
         # TODO: this should be applied only if the next task is GLOBAL
         if not self.nn:
             while not self.synch(task_name, round_number, self.collaborator_name):
-                sleep(0.5)
+                sleep(1)
 
     def synch(self, task_name, round_number, collaborator_name):
         self.logger.info('Waiting for global task completion...')
