@@ -3,6 +3,7 @@
 
 """TensorDB Module."""
 
+import time
 from threading import Lock
 from types import MethodType
 from typing import Dict
@@ -11,7 +12,6 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import time
 
 from openfl.databases.utilities import _search, _store, _retrieve, ROUND_PLACEHOLDER
 from openfl.interface.aggregation_functions import AggregationFunction
@@ -29,7 +29,7 @@ class TensorDB:
     collaborator and aggregator has its own TensorDB.
     """
 
-    def __init__(self, nn=True) -> None:
+    def __init__(self, nn=True, agg=True) -> None:
         """Initialize."""
         self.tensor_db = pd.DataFrame([], columns=[
             'tensor_name', 'origin', 'round', 'report', 'tags', 'nparray'
@@ -37,6 +37,7 @@ class TensorDB:
         self.tensor_db = self.tensor_db.astype({"report": bool})
         self._bind_convenience_methods()
         self.nn = nn
+        self.agg = agg
         self.mutex = Lock()
 
     def _bind_convenience_methods(self):
@@ -59,6 +60,9 @@ class TensorDB:
         return self.__repr__()
 
     def clean_up(self, remove_older_than: int = 1) -> None:
+        print("TensorDB size before: ", str(len(self.tensor_db)))
+        pd.set_option('display.max_columns', None)
+        print(self.tensor_db)
         start_time = time.time()
         """Remove old entries from database preventing the db from becoming too large and slow."""
         if remove_older_than < 0:
@@ -70,13 +74,19 @@ class TensorDB:
         if self.nn:
             self.tensor_db = self.tensor_db[
                 (self.tensor_db['round'].astype(int) > current_round - remove_older_than)
-                ].reset_index(drop=True)
+            ].reset_index(drop=True)
         else:
-            self.tensor_db = self.tensor_db[
-                (self.tensor_db['round'].astype(int) > current_round - remove_older_than) |
-                (self.tensor_db['tags'] == ('weak_learner',))
+            if self.agg:
+                self.tensor_db = self.tensor_db[
+                    (self.tensor_db['round'].astype(int) > current_round - remove_older_than) |
+                    (self.tensor_db['tags'] == ('weak_learner',))
+                    ].reset_index(drop=True)
+            else:
+                self.tensor_db = self.tensor_db[
+                    (self.tensor_db['round'].astype(int) > current_round - remove_older_than)
                 ].reset_index(drop=True)
         print("--- %s seconds for clean_up ---" % (time.time() - start_time))
+        print("TensorDB size after: ", str(len(self.tensor_db)))
 
     def cache_tensor(self, tensor_key_dict: Dict[TensorKey, np.ndarray]) -> None:
         start_time = time.time()

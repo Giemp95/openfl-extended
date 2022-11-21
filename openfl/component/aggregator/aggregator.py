@@ -80,7 +80,7 @@ class Aggregator:
         self.assigner = assigner
         self.quit_job_sent_to = []
 
-        self.tensor_db = TensorDB(self.nn)
+        self.tensor_db = TensorDB(self.nn, agg=True)
         # FIXME: I think next line generates an error on the second round
         # if it is set to 1 for the aggregator.
         self.db_store_rounds = db_store_rounds
@@ -952,7 +952,6 @@ class Aggregator:
             self.logger.info(f'Starting round {self.round_number}...')
 
         # Cleaning tensor db
-        print({self.tensor_db})
         self.tensor_db.clean_up(self.db_store_rounds)
 
     def _is_task_done(self, task_name, round_number=None):

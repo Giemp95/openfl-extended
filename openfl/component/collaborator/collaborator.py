@@ -105,7 +105,7 @@ class Collaborator:
             self.compression_pipeline = GenericPipeline(self.nn)
 
         self.tensor_codec = TensorCodec(self.compression_pipeline)
-        self.tensor_db = TensorDB(self.nn)
+        self.tensor_db = TensorDB(self.nn, agg=False)
         self.db_store_rounds = db_store_rounds
 
         self.task_runner = task_runner
