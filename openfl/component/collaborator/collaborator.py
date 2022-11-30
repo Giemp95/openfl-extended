@@ -166,7 +166,7 @@ class Collaborator:
             if time_to_quit:
                 break
             elif sleep_time > 0:
-                sleep(sleep_time)  # some sleep function
+                sleep(0.01)  # some sleep function
             else:
                 self.logger.info(f'Received the following tasks: {tasks}')
                 for task in tasks:
