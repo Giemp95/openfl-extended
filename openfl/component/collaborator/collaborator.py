@@ -313,6 +313,7 @@ class Collaborator:
                 best_model = int(input_tensor_dict[1])
 
                 self.adaboost_coeff *= np.exp(alpha * self.errors[best_model])
+                self.adaboost_coeff /= np.linalg.norm(self.adaboost_coeff)
 
                 adaboost = self.tensor_db.get_tensor_from_cache(TensorKey(
                     'generic_model',
